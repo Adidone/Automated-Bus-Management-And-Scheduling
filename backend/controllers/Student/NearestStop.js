@@ -1,64 +1,65 @@
 
 const { default: axios } = require("axios");
 const pool = require("../../db.js");
-const { getToken } = require("../../mmiService.js");
+const { getToken } = require("../../GetToken.js");
+const { geoApi } = require("../../geoapi.js");
+require("dotenv").config();
+
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        0.5 - Math.cos(dLat) / 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        (1 - Math.cos(dLon)) / 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const NearestStop = async (address) => {
     try {
         const token = await getToken();
-        if (!token) {
-            return -1;
-        }
-        const geoCodeUrl = `https://atlas.mapmyindia.com/api/places/geocode?address=${address}`;
-        const geoResponse = await axios.get(geoCodeUrl);
+        const apiKey = process.env.MMI_API_KEY;
+        const { latitude, longitude } = await geoApi(address);
+        const addressCords = `${latitude},${longitude}`;
+        // console.log(addressCords);
+        
 
-        if (!geocodeResponse.data.results || geocodeResponse.data.results.length === 0) {
-            throw new Error('Could not geocode the student address.');
-        }
-        const { lat, lng } = geoResponse.data.results[0];
-        const addressCords = `${lat},${lng}`;
-
-        const stopsQuery = 'SELECT id, latitude, longitude, name FROM stops;';
+        const stopsQuery = 'SELECT stop_id, latitude, longitude, name,route_id FROM stops;';
         const stopsResult = await pool.query(stopsQuery);
         const allStops = stopsResult.rows;
         if (allStops.length === 0) {
             throw new Error('No bus stops found in the database.');
         }
 
-        const distancePromises = allStops.map(async (stop) => {
-            const stopCoords = `${stop.latitude},${stop.longitude}`;
-            const routeUrl = `https://apis.mapmyindia.com/advancedmaps/v1/${apiKey}/route?start=${addressCords}&end=${stopCoords}`;
+        const nearestStopData = allStops.reduce((closest, currentStop) => {
+            const distanceInKm = haversineDistance(
+                latitude, longitude,
+                currentStop.latitude, currentStop.longitude
+            );
 
-            try {
-                const routeResponse = await axios.get(routeUrl);
-                // The API response will contain the driving distance
-                const distance = routeResponse.data.results[0].distance; // Or another appropriate field from Mappls API
-
-                return {
-                    id: stop.id,
-                    name: stop.name,
-                    distance// Convert meters to kilometers
-                }
-
-            } catch (error) {
-                // Handle API errors for a single stop
-                return null;
+            // If this is the first stop, it's the closest so far.
+            if (!closest) {
+                return { ...currentStop, distance: distanceInKm };
             }
-        });
 
-        const stopDistances = await Promise.all(distancePromises);
+            // If the current stop is closer, it becomes the new 'closest'.
+            if (distanceInKm < closest.distance) {
+                return { ...currentStop, distance: distanceInKm };
+            }
+        
+            // Otherwise, keep the one we've already found.
+            return closest;
+        }, null);
 
-        // Step 4: Find the nearest stop by filtering for the minimum distance
-        const validDistances = stopDistances.filter(item => item !== null);
-
-        if (validDistances.length === 0) {
-            throw new Error('Could not calculate distances to any bus stops.');
-        }
-
-        const nearestStop = validDistances.reduce((min, current) => (current.distance_km < min.distance_km ? current : min), validDistances[0]);
-
-        // Step 5: Return the nearest stop
-        return nearestStop;
+        return {
+            route_id: nearestStopData.route_id,
+            stop_id: nearestStopData.stop_id, // Correctly using stop_id from the query
+            stop_name: nearestStopData.name,
+            distance: nearestStopData.distance // This is already in kilometers
+        };
     }
     catch (err) {
         return err.message;

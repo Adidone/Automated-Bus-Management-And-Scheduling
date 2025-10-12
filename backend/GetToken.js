@@ -27,6 +27,7 @@ async function getToken() {
 
     cachedToken = res.data.access_token;
     tokenExpiry = Date.now() + res.data.expires_in * 1000;
+    console.log("Token Sucessfull")
     return cachedToken;
   } catch (err) {
     console.error("Error fetching MMI token:", err.response?.data || err.message);

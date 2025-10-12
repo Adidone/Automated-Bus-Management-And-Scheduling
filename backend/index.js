@@ -11,9 +11,20 @@ app.use(cors());
 
 //routes
 const AdminRoutes = require("./routes/AdminRoute.js")
+const StudentRoutes = require("./routes/StudentRoute.js");
+const DriverRoutes = require("./routes/DriverRoute.js");
 
 //api-endpoints
+
+//admin
 app.use("/admin",AdminRoutes);
+
+//student
+app.use("/student",StudentRoutes)
+
+//driver
+app.use("/driver",DriverRoutes);
+
 
 
 
