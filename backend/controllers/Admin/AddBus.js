@@ -7,7 +7,7 @@ const AddBus = async (req, res) => {
         const { bus_number,capacity } = req.body;
         // console.log("Received data:", { bus_number,capacity,fuel_type });
 
-        // Validate required fields
+        
         if (!bus_number || !capacity ) {
             return res.status(400).json({
                 message: "Missing required fields: bus_number, capacity",
@@ -35,7 +35,7 @@ const AddBus = async (req, res) => {
         const newBus = result.rows[0];
 
         return res.status(201).json({
-            message: "Driver added successfully.",
+            message: "Bus added successfully.",
             success: true,
             data: newBus
         });

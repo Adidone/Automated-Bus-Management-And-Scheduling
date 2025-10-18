@@ -3,6 +3,8 @@
 
 https://openrouteservice.org/sign-up/ -api dashboard
 
+https://outpost.mappls.com/api/sso/login.jsp api link
+
 https://developer.mappls.com/mapping/routing-api# -docs
 
 
@@ -36,3 +38,14 @@ https://developer.mappls.com/mapping/routing-api# -docs
     }
   ]
 }
+
+MapmyIndia.direction({
+  start: "16.6871,74.2239", // lat,lng of start
+  end: "16.705,74.2557",    // lat,lng of end
+  via: ["16.7045,74.2433"], // optional middle stops
+  resource: 'route_adv',
+  profile: 'driving'
+}, function(data) {
+  console.log("Route data:", data);
+});
+
