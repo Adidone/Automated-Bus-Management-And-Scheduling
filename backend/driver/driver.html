@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>Driver Live Location</title>
+    <title>Driver Live Tracking</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -10,23 +10,40 @@
     <style>
         #map {
             width: 100%;
-            height: 90vh;
+            height: 80vh;
+        }
+
+        #infoBox {
+            padding: 12px;
+            background: #f1f1f1;
+            border-radius: 6px;
+            width: 260px;
+            margin: 10px auto;
+            font-size: 16px;
+            text-align: center;
+            border: 1px solid #ccc;
         }
     </style>
 </head>
 
 <body>
     <h2 style="text-align:center;">🚍 Driver Live Tracking</h2>
+
+    <div id="infoBox">
+        <b>Next Stop:</b> <span id="nextStop">--</span><br>
+        <b>ETA:</b> <span id="eta">--</span> mins<br>
+        <b>Distance:</b> <span id="distance">--</span> km
+    </div>
+
     <div id="map"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
-        // ✅ Driver ID
         const driver_id = 3;
 
-        // ✅ Stops (Same Route as Admin)
+        // ✅ Route Stops
         const stops = [
             [16.57616197, 74.29479831],
             [16.58377964, 74.30980429],
@@ -35,15 +52,12 @@
             [16.65451617, 74.26181243]
         ];
 
-        // ✅ Initialize Map
+        let currentStopIndex = 0;
+
+        // ✅ Map Setup
         const map = L.map('map').setView(stops[0], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-        // ✅ Map Tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
-        }).addTo(map);
-
-        // ✅ Show Stop Markers
         stops.forEach((stop, i) => {
             L.marker(stop).addTo(map).bindPopup("Stop " + (i + 1));
         });
@@ -51,67 +65,94 @@
         // ✅ ORS API KEY
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // ✅ Draw Real Road Route
+        // ✅ Draw Route
         fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
             method: "POST",
             headers: {
                 "Authorization": apiKey,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                coordinates: stops.map(s => [s[1], s[0]])
-            })
+            body: JSON.stringify({ coordinates: stops.map(s => [s[1], s[0]]) })
         })
         .then(res => res.json())
         .then(data => {
-            const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            L.polyline(routeCoords, { color: "blue", weight: 5 }).addTo(map);
+            const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(coords, { color: "blue", weight: 5 }).addTo(map);
         });
 
-        // ✅ Driver Bus Marker
+        // ✅ Bus Marker
         let busMarker = null;
         const busIcon = L.icon({
             iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61231.png",
             iconSize: [35, 35]
         });
 
-        // ✅ Send & Show Live Location
-        function sendLocation() {
-            if (!navigator.geolocation) {
-                return alert("GPS not supported");
-            }
+        // ✅ Get ETA + Distance to Next Stop
+        async function updateETA(driverLat, driverLng) {
+            const nextStop = stops[currentStopIndex];
 
+            const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                method: "POST",
+                headers: {
+                    "Authorization": apiKey,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    coordinates: [
+                        [driverLng, driverLat],
+                        [nextStop[1], nextStop[0]]
+                    ]
+                })
+            });
+
+            const data = await res.json();
+
+            // ✅ Duration + Distance
+            const summary = data.features[0].properties.summary;
+            const etaMin = Math.round(summary.duration / 60);
+            const distanceKm = (summary.distance / 1000).toFixed(2);
+
+            document.getElementById("nextStop").innerText = currentStopIndex + 1;
+            document.getElementById("eta").innerText = etaMin;
+            document.getElementById("distance").innerText = distanceKm;
+
+            // ✅ AUTO MOVE TO NEXT STOP IF CLOSE
+            if (summary.distance < 50) { // 50 meters
+                currentStopIndex++;
+                if (currentStopIndex >= stops.length) {
+                    currentStopIndex = stops.length - 1;
+                }
+            }
+        }
+
+        // ✅ SEND LOCATION + UPDATE MAP + ETA
+        function sendLocation() {
             navigator.geolocation.getCurrentPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 const position = [latitude, longitude];
 
-                // ✅ UPDATE BUS MARKER ON MAP
                 if (!busMarker) {
                     busMarker = L.marker(position, { icon: busIcon }).addTo(map).bindPopup("🚍 You");
                 } else {
                     busMarker.setLatLng(position);
                 }
 
-                // ✅ SEND TO BACKEND
                 fetch("https://10.222.218.121:5555/driver/update-location", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        driver_id,
-                        latitude,
-                        longitude
-                    })
+                    body: JSON.stringify({ driver_id, latitude, longitude })
                 });
 
-            }, err => console.log(err), {
+                updateETA(latitude, longitude);
+
+            }, console.log, {
                 enableHighAccuracy: true,
                 timeout: 10000,
                 maximumAge: 0
             });
         }
 
-        // ✅ Update every 3 seconds
-        setInterval(sendLocation, 3000);
+        setInterval(sendLocation, 5000);
     </script>
 
 </body>
