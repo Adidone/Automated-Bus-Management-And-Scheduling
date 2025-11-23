@@ -3,9 +3,15 @@ const pool = require("./db");
 require("dotenv").config();
 const cors = require("cors");
 const path = require("path");
+const https = require("https");
+const fs = require("fs");
 
 const { geoApi } = require("./geoapi.js");
 
+const options = {
+  key: fs.readFileSync("localhost+1-key.pem"),
+  cert: fs.readFileSync("localhost+1.pem")
+};
 
 const app = express();
 app.use(express.json());
@@ -60,6 +66,7 @@ app.get("/db", async (req, res) => {
   }
 });
 
-app.listen(5555, () => {
-  console.log("Server is running on 5555");
+https.createServer(options, app).listen(5555, () => {
+  console.log("✅ HTTPS Server running on https://localhost:5555");
+  console.log("✅ Also accessible on https://10.222.218.121:5555");
 });
