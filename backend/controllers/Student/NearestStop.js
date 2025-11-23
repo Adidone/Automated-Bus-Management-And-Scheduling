@@ -7,7 +7,7 @@ require("dotenv").config();
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of the Earth in kilometers
+    const R = 6371; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
@@ -19,6 +19,8 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 const NearestStop = async (address) => {
+    
+    const client = await pool.connect();
     try {
         const token = await getToken();
         const apiKey = process.env.MMI_API_KEY;
@@ -27,12 +29,13 @@ const NearestStop = async (address) => {
         // console.log(addressCords);
         
 
-        const stopsQuery = 'SELECT stop_id, latitude, longitude, name,route_id FROM stops;';
-        const stopsResult = await pool.query(stopsQuery);
+        const stopsQuery = 'SELECT id, latitude, longitude, name FROM stops;';
+        const stopsResult = await client.query(stopsQuery);
         const allStops = stopsResult.rows;
         if (allStops.length === 0) {
             throw new Error('No bus stops found in the database.');
         }
+        
 
         const nearestStopData = allStops.reduce((closest, currentStop) => {
             const distanceInKm = haversineDistance(
@@ -40,28 +43,44 @@ const NearestStop = async (address) => {
                 currentStop.latitude, currentStop.longitude
             );
 
-            // If this is the first stop, it's the closest so far.
+            
             if (!closest) {
                 return { ...currentStop, distance: distanceInKm };
             }
 
-            // If the current stop is closer, it becomes the new 'closest'.
+           
             if (distanceInKm < closest.distance) {
                 return { ...currentStop, distance: distanceInKm };
             }
         
-            // Otherwise, keep the one we've already found.
+            
             return closest;
         }, null);
 
+        
+        // console.log(nearestStopData);
+
+        const routeResult = await client.query(
+            "SELECT route_id FROM route_stops WHERE stop_id = $1 LIMIT 1",
+            [nearestStopData.id]
+        );
+        // console.log(routeResult);
+        
+        const route_id = routeResult.rows.length > 0 ? routeResult.rows[0].route_id : null;
+        // console.log(route_id);
+        
+        
+        
+
+        await client.query('COMMIT');
         return {
-            route_id: nearestStopData.route_id,
-            stop_id: nearestStopData.stop_id, // Correctly using stop_id from the query
+            stop_id: nearestStopData.id, 
             stop_name: nearestStopData.name,
-            distance: nearestStopData.distance // This is already in kilometers
+            route_id
         };
     }
     catch (err) {
+        await client.query('ROLLBACK');
         return err.message;
     }
 }

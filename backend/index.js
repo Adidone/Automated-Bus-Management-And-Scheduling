@@ -2,12 +2,19 @@ const express = require("express");
 const pool = require("./db");
 require("dotenv").config();
 const cors = require("cors");
+const path = require("path");
 
 const { geoApi } = require("./geoapi.js");
 
+
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+app.use(cors({
+    origin: "*"
+}));
+
+app.use(express.static(path.join(__dirname, "driver")));
 
 //routes
 const AdminRoutes = require("./routes/AdminRoute.js")
@@ -24,66 +31,6 @@ app.use("/student",StudentRoutes)
 
 //driver
 app.use("/driver",DriverRoutes);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

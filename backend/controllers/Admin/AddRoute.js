@@ -6,11 +6,14 @@ require("dotenv").config();
 const MMI_API_KEY = process.env.MMI_API_KEY;
 
 const AddRoute = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { name, start_stop_id, end_stop_id } = req.body;
 
+    await client.query('BEGIN');
     
     if (!name || !start_stop_id || !end_stop_id) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         message: "All fields are required (name, start_stop_id, end_stop_id)",
         success: false,
@@ -18,11 +21,12 @@ const AddRoute = async (req, res) => {
     }
 
     
-    const existingRoute = await pool.query(
+    const existingRoute = await client.query(
       "SELECT * FROM routes WHERE name = $1",
       [name]
     );
     if (existingRoute.rows.length > 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         message: "Route with this name already exists",
         success: false,
@@ -30,16 +34,17 @@ const AddRoute = async (req, res) => {
     }
 
    
-    const start = await pool.query(
+    const start = await client.query(
       "SELECT latitude, longitude, name FROM stops WHERE id = $1",
       [start_stop_id]
     );
-    const end = await pool.query(
+    const end = await client.query(
       "SELECT latitude, longitude, name FROM stops WHERE id = $1",
       [end_stop_id]
     );
 
     if (start.rows.length === 0 || end.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         message: "Invalid start or end stop ID",
         success: false,
@@ -55,6 +60,7 @@ const AddRoute = async (req, res) => {
     
     const token = await getToken();
     if (!token) {
+      await client.query('ROLLBACK');
       return res.status(500).json({ message: "Failed to get MMI token" });
     }
 
@@ -82,7 +88,7 @@ const AddRoute = async (req, res) => {
       RETURNING *;
     `;
 
-    const result = await pool.query(addRouteQuery, [
+    const result = await client.query(addRouteQuery, [
       name,
       start_stop_id,
       end_stop_id,
@@ -90,7 +96,7 @@ const AddRoute = async (req, res) => {
     ]);
 
     const newRoute = result.rows[0];
-
+    await client.query('COMMIT')
     return res.status(201).json({
       message: "Route added successfully",
       route: newRoute,
@@ -100,13 +106,14 @@ const AddRoute = async (req, res) => {
     console.error("Error adding route:", error.message);
 
     if (error.response) {
+      await client.query('ROLLBACK');
       console.error("MMI API Error:", error.response.data);
       return res.status(error.response.status).json({
         message: error.response.data.error || "Error with MMI API",
         success: false,
       });
     }
-
+    await client.query('ROLLBACK');
     res.status(500).json({
       message: "Server Error",
       success: false,

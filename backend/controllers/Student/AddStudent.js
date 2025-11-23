@@ -3,12 +3,14 @@ const { geoApi } = require("../../geoapi.js");
 const NearestStop = require("./NearestStop.js");
 
 const AddStudent = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { name, roll_no, phone, email, address, password } = req.body;
         // console.log("Received data:", { name, roll_no, phone, email, address, password });
 
         // Validate required fields
         if (!name || !roll_no || !address || !password) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 message: "Missing required fields: name, roll_no, address, password",
                 success: false
@@ -17,28 +19,29 @@ const AddStudent = async (req, res) => {
         const stop = await NearestStop(address);
         console.log("Nearest stop:", stop.stop_name);
 
-        const{route_id,stop_id,stop_name} = stop;
+        const{stop_id,stop_name,route_id} = stop;
           
         const addStudentQuery = `
-        INSERT INTO students (name, roll_no, phone, email, address, password, stop_name, stop_id,route_id) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8,$9) 
+        INSERT INTO students (name, roll_no, phone, email, address, password,stop_id,stop_name,route_id) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7,$8,$9) 
         RETURNING *;
         `;
 
-        const result = await pool.query(addStudentQuery, [
+        const result = await client.query(addStudentQuery, [
             name,
             roll_no,
             phone,
             email,
             address,
             password,
-            stop.stop_name,
             stop.stop_id,
+            stop.stop_name,
             stop.route_id
         ]);
         const newStudent = result.rows[0];
         // console.log("New student added:", newStudent     
         // const newStudent = result.rows[0];
+        await client.query('COMMIT');
 
         return res.status(201).json({
             message: "Student added successfully.",
@@ -47,6 +50,8 @@ const AddStudent = async (req, res) => {
         });
     }
     catch (err) {
+        await client.query('ROLLBACK');
+        
         console.log("error", err)
         return res.status(500).json({
             message: err.message,

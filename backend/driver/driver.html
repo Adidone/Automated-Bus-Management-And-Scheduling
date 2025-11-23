@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Driver Live Location</title>
+</head>
+
+<body>
+    <h2>Driver Live Tracking</h2>
+
+    <script>
+        const driver_id = 3;
+
+        function sendLocation() {
+            if (!navigator.geolocation) {
+                return alert("GPS not supported");
+            }
+
+            navigator.geolocation.getCurrentPosition(pos => {
+                
+                fetch("http://10.222.218.121:5555/driver/update-location", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        driver_id,
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude
+                    })
+                    
+                });
+
+            }, err => console.log(err)),
+            {
+                enableHighAccuracy: true,  // Use GPS instead of network
+                timeout: 10000,             // Wait up to 10 seconds
+                maximumAge: 0               // Don't use cached location
+            }
+        }
+
+        setInterval(sendLocation, 3000);
+    </script>
+</body>
+
+</html>

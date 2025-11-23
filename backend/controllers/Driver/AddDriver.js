@@ -2,12 +2,14 @@
 const pool = require("../../db.js");
 
 const AddDriver = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { name, phone, email, address, password, liscence_no } = req.body;
         console.log("Received data:", { name, phone, email, address, password,liscence_no });
 
         // Validate required fields
         if (!name || !email || !phone || !address || !password ||!liscence_no) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 message: "Missing required fields: name, vehicle_no, address, password,licsence_no",
                 success: false
@@ -15,9 +17,10 @@ const AddDriver = async (req, res) => {
         }
 
         const checkEmailQuery = 'SELECT * FROM drivers WHERE email = $1';
-        const emailResult = await pool.query(checkEmailQuery, [email]);
+        const emailResult = await client.query(checkEmailQuery, [email]);
 
         if (emailResult.rows.length > 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 message: "Email already exists.",
                 success: false
@@ -30,7 +33,7 @@ const AddDriver = async (req, res) => {
         RETURNING *;
         `;
 
-        const result = await pool.query(addDriverQuery, [
+        const result = await client.query(addDriverQuery, [
             name,
             phone,
             email,
@@ -39,7 +42,7 @@ const AddDriver = async (req, res) => {
             liscence_no,
         ]);
         const newDriver = result.rows[0];
-
+        await client.query('COMMIT');
         return res.status(201).json({
             message: "Driver added successfully.",
             success: true,
@@ -47,6 +50,7 @@ const AddDriver = async (req, res) => {
         });
     }
     catch (err) {
+        await client.query('ROLLBACK');
         console.log("error", err)
         return res.status(500).json({
             message: err.message,

@@ -1,9 +1,11 @@
 const pool = require("../../db");
 
 const DriverTrip = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.body; // driver_id
     if (!id) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         message: "Please provide driver id",
         success: false
@@ -11,12 +13,13 @@ const DriverTrip = async (req, res) => {
     }
 
     // Step 1: Find the trip for this driver
-    const tripResult = await pool.query(
+    const tripResult = await client.query(
       "SELECT * FROM trips WHERE driver_id = $1",
       [id]
     );
 
     if (tripResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         message: "No trip found for this driver",
         success: false
@@ -26,7 +29,7 @@ const DriverTrip = async (req, res) => {
     const route_id = tripResult.rows[0].route_id;
 
     // Step 2: Fetch stops for that route with their distance & coordinates
-    const routeStops = await pool.query(`
+    const routeStops = await client.query(`
       SELECT 
         rs.stop_order,
         rs.distance_from_previous_stop,
@@ -40,6 +43,7 @@ const DriverTrip = async (req, res) => {
     `, [route_id]);
 
     if (routeStops.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         message: "No stops found for this route",
         success: false
@@ -55,6 +59,7 @@ const DriverTrip = async (req, res) => {
       distance_from_prev_km: stop.distance_from_previous_stop || 0
     }));
 
+    await client.query('COMMIT');
     // Step 4: Send response
     return res.status(200).json({
       message: "Driver trip route data fetched successfully",
@@ -64,6 +69,7 @@ const DriverTrip = async (req, res) => {
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error("Error in DriverTrip:", error);
     return res.status(500).json({
       message: error.message,

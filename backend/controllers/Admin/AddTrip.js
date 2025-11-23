@@ -3,55 +3,63 @@
 const pool = require("../../db.js");
 
 const AddTrip = async (req, res) => {
+    const client = await pool.connect();
     try {
+
         const { route_id,bus_id,driver_id,shift } = req.body;
         if (!route_id || !bus_id || !driver_id || !shift ) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 message: "Missing required fields: route_id, bus_id, driver_id, shift",
                 success: false
             });
         }
 
-        const trip = await pool.query(
+        const trip = await client.query(
             "SELECT * FROM trips WHERE route_id = $1 ",
             [route_id]
         );
         if (trip.rows.length > 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 message: "Trip with this route already exists.",
                 success: false
             });
         }
 
-        const routeCheck = await pool.query("SELECT * FROM routes WHERE id = $1", [route_id]);
+        const routeCheck = await client.query("SELECT * FROM routes WHERE id = $1", [route_id]);
         if (routeCheck.rows.length === 0) {
             return res.status(404).json({ message: "Route not found", success: false });
         }
         
-        const busCheck = await pool.query("SELECT * FROM buses WHERE id = $1", [bus_id]);
+        const busCheck = await client.query("SELECT * FROM buses WHERE id = $1", [bus_id]);
         if (busCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: "Bus not found", success: false });
         }
 
-        const driverCheck = await pool.query("SELECT * FROM drivers WHERE id = $1", [driver_id]);
+        const driverCheck = await client.query("SELECT * FROM drivers WHERE id = $1", [driver_id]);
         if (driverCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: "Driver not found", success: false });
         }
 
         const busStatus = busCheck.rows[0].status;
         console.log(busStatus)
         if (busStatus != 'available') {
+            await client.query('ROLLBACK');
             return res.status(400).json({ message: "Bus is already scheduled for another trip", success: false });
         }
 
         const driverStatus = driverCheck.rows[0].status;    
         if (driverStatus != 'available') {
+            await client.query('ROLLBACK');
             return res.status(400).json({ message: "Driver is already scheduled for another trip", success: false });
         }
         
 
-        await pool.query("UPDATE buses SET status = 'not available' WHERE id = $1", [bus_id]);
-        await pool.query("UPDATE drivers SET status = 'not available' WHERE id = $1", [driver_id]);
+        await client.query("UPDATE buses SET status = 'not available' WHERE id = $1", [bus_id]);
+        await client.query("UPDATE drivers SET status = 'not available' WHERE id = $1", [driver_id]);
 
        
         const addTripQuery = `
@@ -60,7 +68,7 @@ const AddTrip = async (req, res) => {
         RETURNING *;
         `;
 
-        const result = await pool.query(addTripQuery, [
+        const result = await client.query(addTripQuery, [
             route_id,
             bus_id,
             driver_id,
@@ -68,7 +76,7 @@ const AddTrip = async (req, res) => {
         ]);
         const newTrip = result.rows[0];
 
-        
+        await client.query('COMMIT')
 
         return res.status(201).json({
             message: "Trip Scheduled successfully.",
@@ -77,6 +85,7 @@ const AddTrip = async (req, res) => {
         });
     }
     catch (err) {
+        await client.query('ROLLBACK');
         console.log("error", err)
         return res.status(500).json({
             message: err.message,

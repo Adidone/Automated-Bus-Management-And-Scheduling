@@ -6,19 +6,22 @@ require("dotenv").config();
 const MMI_API_KEY = process.env.MMI_API_KEY;
 
 const AddRouteStop = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { route_id, stop_id, stop_order } = req.body;
-
+    
     if (!route_id || !stop_id || !stop_order) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         message: "Missing required fields: route_id, stop_id, stop_order",
         success: false,
       });
     }
 
-    const route = await pool.query("SELECT * FROM routes WHERE id = $1", [route_id]);
-    const stop = await pool.query("SELECT * FROM stops WHERE id = $1", [stop_id]);
+    const route = await client.query("SELECT * FROM routes WHERE id = $1", [route_id]);
+    const stop = await client.query("SELECT * FROM stops WHERE id = $1", [stop_id]);
     if (route.rows.length === 0 || stop.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: "Route or Stop not found", success: false });
     }
 
@@ -26,7 +29,7 @@ const AddRouteStop = async (req, res) => {
 
     
     if (stop_order > 1) {
-      const prevStopQuery = await pool.query(
+      const prevStopQuery = await client.query(
         `SELECT s.latitude, s.longitude 
          FROM route_stops rs
          JOIN stops s ON rs.stop_id = s.id
@@ -66,14 +69,17 @@ const AddRouteStop = async (req, res) => {
       VALUES ($1, $2, $3, $4)
       RETURNING *;
     `;
-    const result = await pool.query(insertQuery, [route_id, stop_id, stop_order, distance]);
+    const result = await client.query(insertQuery, [route_id, stop_id, stop_order, distance]);
+
+    await client.query('COMMIT')
 
     return res.status(201).json({
-      message: "Stop added successfully",
+      message: "RouteStop added successfully",
       route_stop: result.rows[0],
       success: true,
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error("Error adding stop to route:", err.response?.data || err.message);
     return res.status(500).json({
       message: "Internal Server Error",

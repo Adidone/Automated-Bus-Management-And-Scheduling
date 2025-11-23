@@ -1,6 +1,7 @@
 const pool = require("../../db");
 
 const LiveTrips = async (req, res) => {
+  const  client = await pool.connect();
   try {
     // Step 1: Get all live (scheduled) trips
     const tripsQuery = `
@@ -23,9 +24,10 @@ const LiveTrips = async (req, res) => {
       ORDER BY t.id;
     `;
 
-    const tripResult = await pool.query(tripsQuery);
+    const tripResult = await client.query(tripsQuery);
 
     if (tripResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         message: "No active or scheduled trips found",
         success: false,
@@ -47,7 +49,7 @@ const LiveTrips = async (req, res) => {
       WHERE rs.route_id = ANY($1::int[])
       ORDER BY rs.route_id, rs.stop_order;
     `;
-    const routeStops = await pool.query(routeStopsQuery, [routeIds]);
+    const routeStops = await client.query(routeStopsQuery, [routeIds]);
 
     // Step 3: Organize stops per route
     const routeStopMap = {};
@@ -75,6 +77,7 @@ const LiveTrips = async (req, res) => {
       stops: routeStopMap[trip.route_id] || [],
     }));
 
+    await client.query('COMMIT');
     // Step 5: Send response
     return res.status(200).json({
       message: "Live trips fetched successfully",
@@ -84,6 +87,7 @@ const LiveTrips = async (req, res) => {
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error("Error fetching live trips:", error);
     return res.status(500).json({
       message: error.message,

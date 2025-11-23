@@ -6,12 +6,12 @@ async function geoApi(address) {
     const token = await getToken();
     if (!token) throw new Error("No token available");
 
-    // Use address passed as parameter
+    
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
 
     const response = await axios.get(url, {
       headers: {
-        "User-Agent": "MyBusApp/1.0 (adidone07@gmail.com)", // Required by Nominatim policy
+        "User-Agent": "MyBusApp/1.0 (adidone07@gmail.com)", 
       },
     });
 
