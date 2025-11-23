@@ -1,28 +1,20 @@
-const pool = require("../../db");
-
 const GetLiveLocations = async (req, res) => {
     try {
+        const { driverId } = req.params;
+
         const result = await pool.query(
-            `SELECT d.driver_id, d.name AS driver_name,
-                    l.latitude, l.longitude, l.updated_at
-             FROM driver_locations l
-             JOIN drivers d ON d.id = l.driver_id
-             WHERE l.id IN (
-                SELECT MAX(id) FROM driver_locations GROUP BY driver_id
-             )`
+            "SELECT latitude, longitude FROM driver_live_location WHERE driver_id = $1",
+            [driverId]
         );
 
-        return res.status(200).json({
-            message: "Live locations fetched",
-            success: true,
-            data: result.rows
-        });
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No location found" });
+        }
+
+        return res.json(result.rows[0]);
 
     } catch (err) {
-        return res.status(500).json({
-            message: err.message,
-            success: false
-        });
+        return res.status(500).json({ message: err.message });
     }
 };
 

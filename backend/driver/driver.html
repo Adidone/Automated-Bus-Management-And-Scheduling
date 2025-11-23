@@ -3,42 +3,117 @@
 
 <head>
     <title>Driver Live Location</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <style>
+        #map {
+            width: 100%;
+            height: 90vh;
+        }
+    </style>
 </head>
 
 <body>
-    <h2>Driver Live Tracking</h2>
+    <h2 style="text-align:center;">🚍 Driver Live Tracking</h2>
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
+        // ✅ Driver ID
         const driver_id = 3;
 
+        // ✅ Stops (Same Route as Admin)
+        const stops = [
+            [16.57616197, 74.29479831],
+            [16.58377964, 74.30980429],
+            [16.62039870, 74.29770568],
+            [16.63783643, 74.27932786],
+            [16.65451617, 74.26181243]
+        ];
+
+        // ✅ Initialize Map
+        const map = L.map('map').setView(stops[0], 12);
+
+        // ✅ Map Tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // ✅ Show Stop Markers
+        stops.forEach((stop, i) => {
+            L.marker(stop).addTo(map).bindPopup("Stop " + (i + 1));
+        });
+
+        // ✅ ORS API KEY
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+
+        // ✅ Draw Real Road Route
+        fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+            method: "POST",
+            headers: {
+                "Authorization": apiKey,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                coordinates: stops.map(s => [s[1], s[0]])
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+            L.polyline(routeCoords, { color: "blue", weight: 5 }).addTo(map);
+        });
+
+        // ✅ Driver Bus Marker
+        let busMarker = null;
+        const busIcon = L.icon({
+            iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61231.png",
+            iconSize: [35, 35]
+        });
+
+        // ✅ Send & Show Live Location
         function sendLocation() {
             if (!navigator.geolocation) {
                 return alert("GPS not supported");
             }
 
             navigator.geolocation.getCurrentPosition(pos => {
-                
+                const { latitude, longitude } = pos.coords;
+                const position = [latitude, longitude];
+
+                // ✅ UPDATE BUS MARKER ON MAP
+                if (!busMarker) {
+                    busMarker = L.marker(position, { icon: busIcon }).addTo(map).bindPopup("🚍 You");
+                } else {
+                    busMarker.setLatLng(position);
+                }
+
+                // ✅ SEND TO BACKEND
                 fetch("https://10.222.218.121:5555/driver/update-location", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         driver_id,
-                        latitude: pos.coords.latitude,
-                        longitude: pos.coords.longitude
+                        latitude,
+                        longitude
                     })
-                    
                 });
 
-            }, err => console.log(err)),
-            {
-                enableHighAccuracy: true,  // Use GPS instead of network
-                timeout: 10000,             // Wait up to 10 seconds
-                maximumAge: 0               // Don't use cached location
-            }
+            }, err => console.log(err), {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
         }
 
+        // ✅ Update every 3 seconds
         setInterval(sendLocation, 3000);
     </script>
+
 </body>
 
 </html>

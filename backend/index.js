@@ -21,6 +21,7 @@ app.use(cors({
 }));
 
 app.use(express.static(path.join(__dirname, "driver")));
+app.use(express.static(path.join(__dirname, "admin")))
 
 //routes
 const AdminRoutes = require("./routes/AdminRoute.js")

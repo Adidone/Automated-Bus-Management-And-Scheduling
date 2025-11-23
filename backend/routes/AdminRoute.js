@@ -18,6 +18,6 @@ router.post("/addtrip",AddTrip);
 router.post("/addstop",AddStop);
 router.post("/routes-stop",AddRouteStop);
 router.get("/livetrips",LiveTrips);
-router.get("/live-locations", GetLiveLocations);
+router.get("/live-location/:driverId", GetLiveLocations);
 
 module.exports = router;
