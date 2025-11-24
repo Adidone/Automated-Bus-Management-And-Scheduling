@@ -438,11 +438,35 @@
 
         // 🚌 Custom Bus Icon with better visuals
         let busMarker = null;
+        let accuracyCircle = null;
+        
         const busIcon = L.divIcon({
             className: 'bus-marker',
             html: '<svg width="50" height="50" viewBox="0 0 24 24" fill="white"><path d="M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16M6.5,17A1.5,1.5 0 0,1 5,15.5A1.5,1.5 0 0,1 6.5,14A1.5,1.5 0 0,1 8,15.5A1.5,1.5 0 0,1 6.5,17M17.5,17A1.5,1.5 0 0,1 16,15.5A1.5,1.5 0 0,1 17.5,14A1.5,1.5 0 0,1 19,15.5A1.5,1.5 0 0,1 17.5,17M6,13V6H18V13H6Z"/></svg>',
             iconSize: [50, 50],
             iconAnchor: [25, 25]
+        });
+
+        // Red pulsing dot for current location
+        const currentLocationIcon = L.divIcon({
+            className: '',
+            html: `<div style="
+                width: 20px; 
+                height: 20px; 
+                background: #ff4757; 
+                border: 3px solid white; 
+                border-radius: 50%;
+                box-shadow: 0 0 10px rgba(255,71,87,0.5);
+                animation: pulse-red 2s infinite;
+            "></div>
+            <style>
+                @keyframes pulse-red {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.2); opacity: 0.7; }
+                }
+            </style>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
         });
 
         async function updateCompletedCount() {
@@ -487,7 +511,7 @@
             debugDiv.style.display = debugMode ? 'block' : 'none';
         }
 
-        // 🚀 Handle Location Update - FIXED VERSION
+        // 🚀 Handle Location Update - FIXED VERSION WITH ACCURACY CIRCLE
         function handleLocationUpdate(position) {
             const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
             const now = Date.now();
@@ -523,22 +547,37 @@
             
             console.log('🚌 Setting bus marker at:', position_coords);
 
-            // Create or update bus marker
+            // Remove old accuracy circle if exists
+            if (accuracyCircle) {
+                map.removeLayer(accuracyCircle);
+            }
+
+            // Add accuracy circle (shows GPS uncertainty)
+            accuracyCircle = L.circle(position_coords, {
+                radius: accuracy,
+                color: '#3742fa',
+                fillColor: '#3742fa',
+                fillOpacity: 0.1,
+                weight: 1
+            }).addTo(map);
+
+            // Create or update bus marker with CURRENT LOCATION ICON
             if (!busMarker) {
-                busMarker = L.marker(position_coords, { icon: busIcon })
+                busMarker = L.marker(position_coords, { icon: currentLocationIcon })
                     .addTo(map)
-                    .bindPopup("🚌 Your Bus<br>Live Location");
+                    .bindPopup(`🚌 Your Current Location<br>Accuracy: ±${accuracy.toFixed(0)}m`);
                 
-                // Center map on first position
-                map.setView(position_coords, 15);
+                // Center map on first position with good zoom
+                map.setView(position_coords, 16);
                 console.log('✅ Bus marker created at:', position_coords);
             } else {
                 // Update existing marker position
                 busMarker.setLatLng(position_coords);
+                busMarker.setPopupContent(`🚌 Your Current Location<br>Accuracy: ±${accuracy.toFixed(0)}m<br>Speed: ${currentSpeed.toFixed(1)} km/h`);
                 console.log('✅ Bus marker updated to:', position_coords);
                 
-                // Optionally recenter map on bus (uncomment if you want continuous centering)
-                // map.panTo(position_coords);
+                // Smoothly pan to new position
+                map.panTo(position_coords, { animate: true, duration: 0.5 });
             }
 
             // Calculate distance and ETA to next stop
