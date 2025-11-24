@@ -34,7 +34,7 @@ const UpdateLocation = async (req, res) => {
         );
 
         // 3️⃣ Check proximity to each incomplete stop
-        const PROXIMITY_THRESHOLD = 0.0005; // ~50 meters
+        const PROXIMITY_THRESHOLD = 0.002; // ~50 meters
         let completedStops = [];
 
         for (let stop of stopsRes.rows) {
