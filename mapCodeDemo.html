@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Bus Tracking Demo</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <style>
+        #map {
+            width: 100%;
+            height: 90vh;
+        }
+    </style>
+</head>
+
+<body>
+    <h2 style="text-align:center;">🚍 Live Bus Tracking</h2>
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <script>
+        // ✅ Stops (Your route)
+        const stops = [
+            [16.57872412, 74.29503641],
+            [16.67844726, 74.22397193],
+            [16.67450067, 74.23676070],
+            [16.66266040, 74.23993644],
+            [16.65451617, 74.26181243]
+        ];
+
+        // ✅ Initialize Map
+        const map = L.map('map').setView(stops[0], 12);
+
+        // ✅ Load Map Tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // ✅ Add Stop Markers
+        stops.forEach((stop, i) => {
+            L.marker(stop).addTo(map).bindPopup("Stop " + (i + 1));
+        });
+
+        // ✅ ORS API Key
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+
+        // ✅ Fetch Real Road Route
+        fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+            method: "POST",
+            headers: {
+                "Authorization": apiKey,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                coordinates: stops.map(s => [s[1], s[0]])
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            // ✅ Draw Route
+            const routeLayer = L.geoJSON(data, { style: { color: "blue", weight: 5 }}).addTo(map);
+
+            // ✅ Extract Route Coordinates
+            const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+            // ✅ Add Bus Marker
+            let index = 0;
+            const busMarker = L.marker(coords[0]).addTo(map).bindPopup("🚍 Bus");
+
+            // ✅ Move Bus Every 1 Second
+            setInterval(() => {
+                if (index < coords.length) {
+                    busMarker.setLatLng(coords[index]);
+                    index++;
+                }
+            }, 1000);
+        })
+        .catch(err => console.error(err));
+    </script>
+
+</body>
+</html>

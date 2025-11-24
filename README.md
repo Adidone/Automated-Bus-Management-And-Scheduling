@@ -49,3 +49,6 @@ MapmyIndia.direction({
   console.log("Route data:", data);
 });
 
+
+
+ip = 10.222.218.121
