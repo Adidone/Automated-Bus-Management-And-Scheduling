@@ -137,7 +137,7 @@
                     busMarker.setLatLng(position);
                 }
 
-                fetch("http://localhost:5555/driver/update-location", {
+                fetch("/driver/update-location", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ driver_id, latitude, longitude })

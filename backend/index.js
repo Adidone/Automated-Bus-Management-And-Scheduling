@@ -62,6 +62,24 @@ app.get("/db", async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.send(`
+    <html>
+      <head><title>Bus Management System</title></head>
+      <body style="font-family: Arial; text-align: center; padding: 50px;">
+        <h1>🚌 Automated Bus Management System</h1>
+        <p>Server is running successfully!</p>
+        <h3>Available Routes:</h3>
+        <ul style="list-style: none;">
+          <li><a href="/driver.html">🚗 Driver Tracking</a></li>
+          <li><a href="/admin">👨‍💼 Admin Panel</a></li>
+          <li><a href="/student">👨‍🎓 Student Portal</a></li>
+        </ul>
+      </body>
+    </html>
+  `);
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
