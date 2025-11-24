@@ -17,14 +17,26 @@ const GetETA = async (req, res) => {
 
         const { latitude, longitude } = driverRes.rows[0];
 
-        // 2️⃣ Get next stop from route_stops
+        // 2️⃣ Get next INCOMPLETE stop
         const stopRes = await pool.query(
-            `SELECT s.name, s.latitude, s.longitude
+            `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
              JOIN stops s ON rs.stop_id = s.id
-             WHERE rs.stop_order = 1 
-             LIMIT 1`
+             LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1
+             WHERE cs.stop_id IS NULL
+             ORDER BY rs.stop_order ASC
+             LIMIT 1`,
+            [driver_id]
         );
+
+        if (stopRes.rows.length === 0) {
+            return res.json({
+                success: true,
+                message: "All stops completed!",
+                next_stop: "Route Complete",
+                eta_minutes: 0
+            });
+        }
 
         const nextStop = stopRes.rows[0];
 
@@ -39,22 +51,27 @@ const GetETA = async (req, res) => {
             },
             {
                 headers: {
-                    "Authorization": process.env.ORS_API_KEY,
+                    "Authorization": process.env.ORS_API_KEY || "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135",
                     "Content-Type": "application/json"
                 }
             }
         );
 
         const durationSeconds = orsRes.data.routes[0].summary.duration;
+        const distanceMeters = orsRes.data.routes[0].summary.distance;
         const etaMinutes = (durationSeconds / 60).toFixed(1);
+        const distanceKm = (distanceMeters / 1000).toFixed(2);
 
         return res.json({
             success: true,
             next_stop: nextStop.name,
-            eta_minutes: etaMinutes
+            stop_order: nextStop.stop_order,
+            eta_minutes: etaMinutes,
+            distance_km: distanceKm
         });
 
     } catch (err) {
+        console.error("GetETA error:", err);
         return res.status(500).json({ success: false, message: err.message });
     }
 };

@@ -3,47 +3,146 @@
 
 <head>
     <title>Driver Live Tracking</title>
-
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
     <style>
-        #map {
-            width: 100%;
-            height: 80vh;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        h2 {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            font-size: 1.8em;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #resetBtn {
+            background: #ff4757;
+            color: white;
+        }
+
+        #resetBtn:hover {
+            background: #ff3838;
+        }
+
+        #completedBtn {
+            background: #2ed573;
+            color: white;
+        }
+
+        #completedBtn:hover {
+            background: #26de81;
         }
 
         #infoBox {
-            padding: 12px;
-            background: #f1f1f1;
-            border-radius: 6px;
-            width: 260px;
-            margin: 10px auto;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            width: 300px;
+            margin: 15px auto;
             font-size: 16px;
-            text-align: center;
-            border: 1px solid #ccc;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        #infoBox b {
+            color: #667eea;
+        }
+
+        #infoBox span {
+            color: #333;
+            font-weight: 600;
+        }
+
+        #map {
+            width: 100%;
+            height: calc(100vh - 220px);
+            border-top: 3px solid #667eea;
+        }
+
+        #status {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2ed573;
+            animation: pulse 2s infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
 
 <body>
-    <h2 style="text-align:center;">🚍 Driver Live Tracking</h2>
+    <h2>🚌 Driver Live Tracking</h2>
+
+    <div id="controls">
+        <button id="resetBtn" onclick="resetRoute()">🔄 Reset Route</button>
+        <button id="completedBtn" onclick="showCompleted()">✅ View Completed</button>
+    </div>
 
     <div id="infoBox">
-        <b>Next Stop:</b> <span id="nextStop">--</span><br>
+        <b>Next Stop:</b> <span id="nextStop">Loading...</span><br>
         <b>ETA:</b> <span id="eta">--</span> mins<br>
-        <b>Distance:</b> <span id="distance">--</span> km
+        <b>Distance:</b> <span id="distance">--</span> km<br>
+        <b>Completed:</b> <span id="completedCount">0</span> stops
+    </div>
+
+    <div id="status">
+        <span class="status-dot"></span>
+        <span>Live Tracking Active</span>
     </div>
 
     <div id="map"></div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
         const driver_id = 3;
 
-        // ✅ Route Stops
+        // Route Stops
         const stops = [
             [16.57616197, 74.29479831],
             [16.58377964, 74.30980429],
@@ -52,20 +151,21 @@
             [16.65451617, 74.26181243]
         ];
 
-        let currentStopIndex = 0;
-
-        // ✅ Map Setup
+        // Map Setup
         const map = L.map('map').setView(stops[0], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
 
         stops.forEach((stop, i) => {
-            L.marker(stop).addTo(map).bindPopup("Stop " + (i + 1));
+            L.marker(stop).addTo(map).bindPopup(`<b>Stop ${i + 1}</b>`);
         });
 
-        // ✅ ORS API KEY
+        // ORS API KEY
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // ✅ Draw Route
+        // Draw Route
         fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
             method: "POST",
             headers: {
@@ -77,62 +177,55 @@
         .then(res => res.json())
         .then(data => {
             const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            L.polyline(coords, { color: "blue", weight: 5 }).addTo(map);
-        });
+            L.polyline(coords, { color: "#667eea", weight: 5 }).addTo(map);
+        })
+        .catch(err => console.error("Route error:", err));
 
-        // ✅ Bus Marker
+        // Bus Marker
         let busMarker = null;
         const busIcon = L.icon({
             iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61231.png",
-            iconSize: [35, 35]
+            iconSize: [40, 40]
         });
 
-        // ✅ Get ETA + Distance to Next Stop
-        async function updateETA(driverLat, driverLng) {
-            const nextStop = stops[currentStopIndex];
+        // Get ETA from backend
+        async function updateETA() {
+            try {
+                const res = await fetch(`/driver/eta/${driver_id}`);
+                const data = await res.json();
 
-            const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
-                method: "POST",
-                headers: {
-                    "Authorization": apiKey,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    coordinates: [
-                        [driverLng, driverLat],
-                        [nextStop[1], nextStop[0]]
-                    ]
-                })
-            });
-
-            const data = await res.json();
-
-            // ✅ Duration + Distance
-            const summary = data.features[0].properties.summary;
-            const etaMin = Math.round(summary.duration / 60);
-            const distanceKm = (summary.distance / 1000).toFixed(2);
-
-            document.getElementById("nextStop").innerText = currentStopIndex + 1;
-            document.getElementById("eta").innerText = etaMin;
-            document.getElementById("distance").innerText = distanceKm;
-
-            // ✅ AUTO MOVE TO NEXT STOP IF CLOSE
-            if (summary.distance < 50) { // 50 meters
-                currentStopIndex++;
-                if (currentStopIndex >= stops.length) {
-                    currentStopIndex = stops.length - 1;
+                if (data.success) {
+                    document.getElementById("nextStop").innerText = data.next_stop;
+                    document.getElementById("eta").innerText = data.eta_minutes;
+                    document.getElementById("distance").innerText = data.distance_km;
                 }
+            } catch (err) {
+                console.error("ETA error:", err);
             }
         }
 
-        // ✅ SEND LOCATION + UPDATE MAP + ETA
+        // Update completed count
+        async function updateCompletedCount() {
+            try {
+                const res = await fetch(`/driver/completed-stops/${driver_id}`);
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById("completedCount").innerText = data.total_completed;
+                }
+            } catch (err) {
+                console.error("Completed count error:", err);
+            }
+        }
+
+        // Send Location + Update Map
         function sendLocation() {
             navigator.geolocation.getCurrentPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 const position = [latitude, longitude];
 
                 if (!busMarker) {
-                    busMarker = L.marker(position, { icon: busIcon }).addTo(map).bindPopup("🚍 You");
+                    busMarker = L.marker(position, { icon: busIcon }).addTo(map).bindPopup("🚌 You");
+                    map.setView(position, 14);
                 } else {
                     busMarker.setLatLng(position);
                 }
@@ -141,18 +234,66 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ driver_id, latitude, longitude })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.completed_stops && data.completed_stops.length > 0) {
+                        console.log("✅ Completed:", data.completed_stops);
+                        updateCompletedCount();
+                    }
                 });
 
-                updateETA(latitude, longitude);
+                updateETA();
 
-            }, console.log, {
+            }, console.error, {
                 enableHighAccuracy: true,
                 timeout: 10000,
                 maximumAge: 0
             });
         }
 
+        // Reset Route
+        async function resetRoute() {
+            if (!confirm("Reset route? This will clear all completed stops.")) return;
+
+            try {
+                const res = await fetch("/driver/reset-route", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ driver_id })
+                });
+                const data = await res.json();
+                alert(data.message);
+                updateCompletedCount();
+                updateETA();
+            } catch (err) {
+                alert("Error resetting route");
+            }
+        }
+
+        // Show Completed Stops
+        async function showCompleted() {
+            try {
+                const res = await fetch(`/driver/completed-stops/${driver_id}`);
+                const data = await res.json();
+                
+                if (data.completed_stops.length === 0) {
+                    alert("No stops completed yet!");
+                } else {
+                    const list = data.completed_stops.map(s => 
+                        `${s.stop_order}. ${s.name} - ${new Date(s.completed_at).toLocaleTimeString()}`
+                    ).join('\n');
+                    alert(`Completed Stops:\n\n${list}`);
+                }
+            } catch (err) {
+                alert("Error fetching completed stops");
+            }
+        }
+
+        // Start tracking
         setInterval(sendLocation, 5000);
+        sendLocation(); // Initial call
+        updateCompletedCount(); // Initial count
     </script>
 
 </body>

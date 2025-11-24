@@ -8,7 +8,6 @@ const AddTrip = require("../controllers/Admin/AddTrip.js");
 const AddStop = require("../controllers/Admin/AddStop.js");
 const AddRouteStop = require("../controllers/Admin/AddRouteStop.js");
 const LiveTrips = require("../controllers/Admin/LiveTrips.js");
-const GetLiveLocations = require("../controllers/Admin/GetLiveLocations.js");
 
 router.post("/login",AdminLogin);
 router.post("/addbus",AddBus);
@@ -18,6 +17,5 @@ router.post("/addtrip",AddTrip);
 router.post("/addstop",AddStop);
 router.post("/routes-stop",AddRouteStop);
 router.get("/livetrips",LiveTrips);
-router.get("/live-location/:driverId", GetLiveLocations);
 
 module.exports = router;
