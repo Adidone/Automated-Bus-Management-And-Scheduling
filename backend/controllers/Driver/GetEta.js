@@ -22,7 +22,7 @@ const GetETA = async (req, res) => {
             `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
              JOIN stops s ON rs.stop_id = s.id
-             LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1
+             LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1 AND rs.route_id=4
              WHERE cs.stop_id IS NULL
              ORDER BY rs.stop_order ASC
              LIMIT 1`,
