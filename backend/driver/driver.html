@@ -31,7 +31,8 @@
             gap: 10px;
             padding: 10px;
             background: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
         }
 
         button {
@@ -41,15 +42,16 @@
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s;
+            font-weight: 600;
         }
 
         #resetBtn {
-            background: #ff4757;
+            background: #ffa502;
             color: white;
         }
 
         #resetBtn:hover {
-            background: #ff3838;
+            background: #ff7f00;
         }
 
         #completedBtn {
@@ -61,14 +63,23 @@
             background: #26de81;
         }
 
+        #logoutBtn {
+            background: #ff4757;
+            color: white;
+        }
+
+        #logoutBtn:hover {
+            background: #ee3344;
+        }
+
         #infoBox {
             padding: 15px;
             background: white;
             border-radius: 8px;
-            width: 300px;
+            width: 320px;
             margin: 15px auto;
             font-size: 16px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         #infoBox b {
@@ -82,7 +93,7 @@
 
         #map {
             width: 100%;
-            height: calc(100vh - 220px);
+            height: calc(100vh - 260px);
             border-top: 3px solid #667eea;
         }
 
@@ -93,7 +104,7 @@
             background: white;
             padding: 10px 15px;
             border-radius: 5px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             z-index: 1000;
             font-size: 14px;
         }
@@ -103,21 +114,21 @@
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: #2ed573;
             animation: pulse 2s infinite;
             margin-right: 8px;
         }
 
+        .status-dot.active {
+            background: #2ed573;
+        }
+
+        .status-dot.stale {
+            background: #ff4757;
+        }
+
         @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .updating {
@@ -125,13 +136,99 @@
             font-size: 12px;
         }
 
-        #logoutBtn {
+        .gps-info {
+            color: #999;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        /* Custom Bus Icon Styles */
+        .bus-marker {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        /* Modal for logout confirmation */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 20% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .modal-content p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .modal-btn.confirm {
             background: #ff4757;
             color: white;
         }
 
-        #logoutBtn:hover {
+        .modal-btn.confirm:hover {
             background: #ee3344;
+        }
+
+        .modal-btn.cancel {
+            background: #ddd;
+            color: #333;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #ccc;
         }
     </style>
 </head>
@@ -144,22 +241,42 @@
         <button id="completedBtn" onclick="showCompleted()">✅ View Completed</button>
         <button id="logoutBtn" onclick="showLogoutModal()">🚪 Logout & Clear</button>
     </div>
-    </div>
 
     <div id="infoBox">
         <b>Next Stop:</b> <span id="nextStop">Loading...</span><br>
         <b>ETA:</b> <span id="eta">--</span> mins<br>
         <b>Distance:</b> <span id="distance">--</span> km<br>
+        <b>Speed:</b> <span id="speed">--</span> km/h<br>
         <b>Completed:</b> <span id="completedCount">0</span> stops<br>
-        <span class="updating" id="updateStatus">Initializing...</span>
+        <span class="updating" id="updateStatus">Initializing...</span><br>
+        <span class="gps-info" id="gpsInfo">GPS: --</span>
     </div>
 
     <div id="status">
-        <span class="status-dot"></span>
-        <span>Live Tracking Active</span>
+        <span class="status-dot active" id="statusDot"></span>
+        <span id="statusText">Live Tracking Active</span>
     </div>
 
     <div id="map"></div>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content">
+            <h3>⚠️ Confirm Logout</h3>
+            <p>This will:</p>
+            <ul style="text-align: left; margin: 15px 0;">
+                <li>✅ Clear all completed stops</li>
+                <li>✅ Reset your route progress</li>
+                <li>✅ Stop GPS tracking</li>
+                <li>✅ Return to home page</li>
+            </ul>
+            <p style="color: #ff4757; font-weight: 600;">Are you sure?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-btn confirm" onclick="confirmLogout()">Yes, Logout</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -170,33 +287,41 @@
         let stops = [];
         let map = null;
         let nextStopData = null;
-        let updateCount = 0;
+        let watchId = null;
+        let lastUpdateTime = Date.now();
+        let lastPosition = null;
 
         // ORS API KEY
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // 📍 Haversine formula for accurate distance calculation
+        // 📍 Haversine formula
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Earth's radius in km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; // Distance in km
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
         }
 
-        // ⏱️ Estimate ETA based on distance
-        function estimateETA(distanceKm, avgSpeedKmh = 30) {
-            // Average city bus speed: 30 km/h
-            const hours = distanceKm / avgSpeedKmh;
-            const minutes = hours * 60;
-            return Math.max(1, Math.round(minutes)); // Minimum 1 minute
+        // ⏱️ Estimate ETA
+        function estimateETA(distanceKm, speedKmh) {
+            if (speedKmh && speedKmh > 5) {
+                const hours = distanceKm / speedKmh;
+                const minutes = hours * 60;
+                return Math.max(1, Math.round(minutes));
+            } else {
+                const avgSpeed = 30;
+                const hours = distanceKm / avgSpeed;
+                const minutes = hours * 60;
+                return Math.max(1, Math.round(minutes));
+            }
         }
 
-        // 🎯 Get Next Stop from Backend (only when needed)
+        // 🎯 Get Next Stop
         async function fetchNextStop() {
             try {
                 const res = await fetch(`/driver/eta/${driver_id}`);
@@ -216,54 +341,50 @@
             }
         }
 
-        // Initialize Map and Load Stops
+        // Initialize Map
         async function initMap() {
             try {
                 const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
-
+                
                 if (data.success && data.stops) {
                     stops = data.stops;
                 } else {
                     stops = [
-                        { latitude: 16.57865479, longitude: 74.29502221 },
-                        { latitude: 16.58377964, longitude: 74.30980429 },
-                        { latitude: 16.62039870, longitude: 74.29770568 },
-                        { latitude: 16.63783643, longitude: 74.27932786 },
-                        { latitude: 16.65451617, longitude: 74.26181243 }
+                        {latitude: 16.57865479, longitude: 74.29502221},
+                        {latitude: 16.58377964, longitude: 74.30980429},
+                        {latitude: 16.62039870, longitude: 74.29770568},
+                        {latitude: 16.63783643, longitude: 74.27932786},
+                        {latitude: 16.65451617, longitude: 74.26181243}
                     ];
                 }
             } catch (err) {
                 console.error("Error fetching stops:", err);
                 stops = [
-                    { latitude: 16.57865479, longitude: 74.29502221 },
-                    { latitude: 16.58377964, longitude: 74.30980429 },
-                    { latitude: 16.62039870, longitude: 74.29770568 },
-                    { latitude: 16.63783643, longitude: 74.27932786 },
-                    { latitude: 16.65451617, longitude: 74.26181243 }
+                    {latitude: 16.57865479, longitude: 74.29502221},
+                    {latitude: 16.58377964, longitude: 74.30980429},
+                    {latitude: 16.62039870, longitude: 74.29770568},
+                    {latitude: 16.63783643, longitude: 74.27932786},
+                    {latitude: 16.65451617, longitude: 74.26181243}
                 ];
             }
 
-            // Create map
             const firstStop = stops[0];
             map = L.map('map').setView([firstStop.latitude, firstStop.longitude], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // Add stop markers
             stops.forEach((stop, i) => {
                 L.marker([stop.latitude, stop.longitude])
                     .addTo(map)
                     .bindPopup(`<b>Stop ${i + 1}</b>`);
             });
 
-            // Draw route
             drawRoute();
         }
 
-        // Draw Route
         async function drawRoute() {
             try {
                 const coords = stops.map(s => [s.longitude, s.latitude]);
@@ -284,16 +405,15 @@
             }
         }
 
-        // Bus Marker
+        // 🚌 Custom Bus Icon with better visuals
         let busMarker = null;
         const busIcon = L.divIcon({
             className: 'bus-marker',
-            html: '<div style="font-size:40px;text-shadow:2px 2px 4px rgba(0,0,0,0.5);">🚌</div>',
+            html: '<svg width="50" height="50" viewBox="0 0 24 24" fill="white"><path d="M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16M6.5,17A1.5,1.5 0 0,1 5,15.5A1.5,1.5 0 0,1 6.5,14A1.5,1.5 0 0,1 8,15.5A1.5,1.5 0 0,1 6.5,17M17.5,17A1.5,1.5 0 0,1 16,15.5A1.5,1.5 0 0,1 17.5,14A1.5,1.5 0 0,1 19,15.5A1.5,1.5 0 0,1 17.5,17M6,13V6H18V13H6Z"/></svg>',
             iconSize: [50, 50],
             iconAnchor: [25, 25]
         });
 
-        // Update completed count
         async function updateCompletedCount() {
             try {
                 const res = await fetch(`/driver/completed-stops/${driver_id}`);
@@ -306,67 +426,111 @@
             }
         }
 
-        // 🚀 FAST Location Update (runs every 2 seconds)
-        function sendLocation() {
-            navigator.geolocation.watchPosition(pos => {
-                const { latitude, longitude } = pos.coords;
-                const position = [latitude, longitude];
+        // 🚀 Handle Location Update
+        function handleLocationUpdate(position) {
+            const { latitude, longitude, speed, accuracy } = position.coords;
+            const now = Date.now();
+            const timeSinceLastUpdate = (now - lastUpdateTime) / 1000;
 
-                // Update bus marker on map
-                if (!busMarker) {
-                    busMarker = L.marker(position, { icon: busIcon }).addTo(map).bindPopup("🚌 You");
-                    map.setView(position, 14);
-                } else {
-                    busMarker.setLatLng(position);
-                }
+            lastUpdateTime = now;
+            document.getElementById("statusDot").className = "status-dot active";
+            document.getElementById("gpsInfo").innerText = `GPS: ±${accuracy.toFixed(0)}m | ${new Date().toLocaleTimeString()}`;
 
-                // Calculate ETA locally (INSTANT - no API call!)
-                if (nextStopData && nextStopData.lat && nextStopData.lng) {
-                    const distance = calculateDistance(
-                        latitude, longitude,
-                        nextStopData.lat, nextStopData.lng
-                    );
-                    const eta = estimateETA(distance);
+            let currentSpeed = speed ? speed * 3.6 : 0;
+            
+            if (!speed && lastPosition) {
+                const distance = calculateDistance(
+                    lastPosition.latitude, lastPosition.longitude,
+                    latitude, longitude
+                );
+                currentSpeed = (distance / timeSinceLastUpdate) * 3600;
+            }
 
-                    document.getElementById("distance").innerText = distance.toFixed(2);
-                    document.getElementById("eta").innerText = eta;
-                    document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
-                }
+            lastPosition = { latitude, longitude };
 
-                // Send location to backend (for stop completion detection)
+            const position_coords = [latitude, longitude];
+            if (!busMarker) {
+                busMarker = L.marker(position_coords, { icon: busIcon }).addTo(map).bindPopup("🚌 Your Bus");
+                map.setView(position_coords, 14);
+            } else {
+                busMarker.setLatLng(position_coords);
+            }
+
+            if (nextStopData && nextStopData.lat && nextStopData.lng) {
+                const distance = calculateDistance(
+                    latitude, longitude,
+                    nextStopData.lat, nextStopData.lng
+                );
+                const eta = estimateETA(distance, currentSpeed);
+                
+                document.getElementById("distance").innerText = distance.toFixed(2);
+                document.getElementById("eta").innerText = eta;
+                document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
+                document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
+            }
+
+            if (timeSinceLastUpdate >= 2) {
                 fetch("/driver/update-location", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ driver_id, latitude, longitude })
                 })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.completed_stops && data.completed_stops.length > 0) {
-                            console.log("✅ Completed:", data.completed_stops);
-                            updateCompletedCount();
-                            fetchNextStop(); // Refresh next stop only when completed
-                        }
-                    })
-                    .catch(err => console.error("Location update error:", err));
-
-                // Refresh next stop from backend every 30 seconds (for accuracy)
-                updateCount++;
-                if (updateCount >= 15) { // 15 * 2 seconds = 30 seconds
-                    fetchNextStop();
-                    updateCount = 0;
-                }
-
-            }, (err) => {
-                console.error("Geolocation error:", err);
-                document.getElementById("updateStatus").innerText = "GPS error";
-            }, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.completed_stops && data.completed_stops.length > 0) {
+                        console.log("✅ Completed:", data.completed_stops);
+                        updateCompletedCount();
+                        fetchNextStop();
+                    }
+                })
+                .catch(err => console.error("Location update error:", err));
+            }
         }
 
-        // Reset Route
+        function handleLocationError(error) {
+            console.error("Geolocation error:", error);
+            document.getElementById("statusDot").className = "status-dot stale";
+            document.getElementById("statusText").innerText = "GPS Error";
+            document.getElementById("gpsInfo").innerText = `Error: ${error.message}`;
+        }
+
+        function startTracking() {
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(
+                    handleLocationUpdate,
+                    handleLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+                console.log("✅ Continuous GPS tracking started");
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        function stopTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                console.log("⏹️ GPS tracking stopped");
+            }
+        }
+
+        setInterval(() => {
+            fetchNextStop();
+        }, 30000);
+
+        setInterval(() => {
+            const timeSinceUpdate = (Date.now() - lastUpdateTime) / 1000;
+            if (timeSinceUpdate > 10) {
+                document.getElementById("statusDot").className = "status-dot stale";
+                document.getElementById("statusText").innerText = "GPS Stale";
+            }
+        }, 5000);
+
         async function resetRoute() {
             if (!confirm("Reset route? This will clear all completed stops.")) return;
 
@@ -385,16 +549,15 @@
             }
         }
 
-        // Show Completed Stops
         async function showCompleted() {
             try {
                 const res = await fetch(`/driver/completed-stops/${driver_id}`);
                 const data = await res.json();
-
+                
                 if (data.completed_stops.length === 0) {
                     alert("No stops completed yet!");
                 } else {
-                    const list = data.completed_stops.map(s =>
+                    const list = data.completed_stops.map(s => 
                         `${s.stop_order}. ${s.name} - ${new Date(s.completed_at).toLocaleTimeString()}`
                     ).join('\n');
                     alert(`Completed Stops:\n\n${list}`);
@@ -404,6 +567,7 @@
             }
         }
 
+        // 🚪 Logout Modal Functions
         function showLogoutModal() {
             document.getElementById('logoutModal').style.display = 'block';
         }
@@ -425,7 +589,7 @@
                 });
 
                 const data = await res.json();
-
+                
                 if (data.success) {
                     // Clear location data
                     await fetch("/driver/clear-location", {
@@ -435,7 +599,7 @@
                     });
 
                     alert("✅ Logout successful! Data cleared.");
-
+                    
                     // Redirect to home page
                     window.location.href = "/";
                 } else {
@@ -449,20 +613,21 @@
         }
 
         // Close modal if clicked outside
-        window.onclick = function (event) {
+        window.onclick = function(event) {
             const modal = document.getElementById('logoutModal');
             if (event.target == modal) {
                 closeLogoutModal();
             }
         }
 
-        // 🚀 Initialize Everything
+        // 🚀 Initialize
         initMap().then(() => {
-            fetchNextStop(); // Get first stop
-            setInterval(sendLocation, 2000); // Update every 2 seconds
-            sendLocation(); // Initial call
+            fetchNextStop();
+            startTracking();
             updateCompletedCount();
         });
+
+        window.addEventListener('beforeunload', stopTracking);
     </script>
 
 </body>
