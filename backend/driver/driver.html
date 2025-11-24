@@ -141,45 +141,80 @@
 
     <script>
         const driver_id = 3;
+        const route_id = 4; // Your route ID
 
-        // Route Stops
-        const stops = [
-            [16.57616197, 74.29479831],
-            [16.58377964, 74.30980429],
-            [16.62039870, 74.29770568],
-            [16.63783643, 74.27932786],
-            [16.65451617, 74.26181243]
-        ];
-
-        // Map Setup
-        const map = L.map('map').setView(stops[0], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        stops.forEach((stop, i) => {
-            L.marker(stop).addTo(map).bindPopup(`<b>Stop ${i + 1}</b>`);
-        });
+        let stops = [];
+        let map = null;
 
         // ORS API KEY
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
+        // Initialize Map and Load Stops
+        async function initMap() {
+            // Fetch stops from backend
+            try {
+                const res = await fetch(`/admin/routes/${route_id}/stops`);
+                const data = await res.json();
+                
+                if (data.success && data.stops) {
+                    stops = data.stops.map(s => [s.latitude, s.longitude]);
+                } else {
+                    // Fallback to hardcoded stops if API fails
+                    stops = [
+                        [16.57616197, 74.29479831],
+                        [16.58377964, 74.30980429],
+                        [16.62039870, 74.29770568],
+                        [16.63783643, 74.27932786],
+                        [16.65451617, 74.26181243]
+                    ];
+                }
+            } catch (err) {
+                console.error("Error fetching stops:", err);
+                // Use fallback stops
+                stops = [
+                    [16.57616197, 74.29479831],
+                    [16.58377964, 74.30980429],
+                    [16.62039870, 74.29770568],
+                    [16.63783643, 74.27932786],
+                    [16.65451617, 74.26181243]
+                ];
+            }
+
+            // Create map
+            map = L.map('map').setView(stops[0], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            // Add stop markers
+            stops.forEach((stop, i) => {
+                L.marker(stop).addTo(map).bindPopup(`<b>Stop ${i + 1}</b>`);
+            });
+
+            // Draw route
+            drawRoute();
+        }
+
         // Draw Route
-        fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
-            method: "POST",
-            headers: {
-                "Authorization": apiKey,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ coordinates: stops.map(s => [s[1], s[0]]) })
-        })
-        .then(res => res.json())
-        .then(data => {
-            const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            L.polyline(coords, { color: "#667eea", weight: 5 }).addTo(map);
-        })
-        .catch(err => console.error("Route error:", err));
+        async function drawRoute() {
+            try {
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": apiKey,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ coordinates: stops.map(s => [s[1], s[0]]) })
+                });
+
+                const data = await res.json();
+                const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                L.polyline(coords, { color: "#667eea", weight: 5 }).addTo(map);
+            } catch (err) {
+                console.error("Route drawing error:", err);
+            }
+        }
 
         // Bus Marker
         let busMarker = null;
@@ -195,9 +230,9 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    document.getElementById("nextStop").innerText = data.next_stop;
-                    document.getElementById("eta").innerText = data.eta_minutes;
-                    document.getElementById("distance").innerText = data.distance_km;
+                    document.getElementById("nextStop").innerText = data.next_stop || "Loading...";
+                    document.getElementById("eta").innerText = data.eta_minutes || "--";
+                    document.getElementById("distance").innerText = data.distance_km || "--";
                 }
             } catch (err) {
                 console.error("ETA error:", err);
@@ -210,7 +245,7 @@
                 const res = await fetch(`/driver/completed-stops/${driver_id}`);
                 const data = await res.json();
                 if (data.success) {
-                    document.getElementById("completedCount").innerText = data.total_completed;
+                    document.getElementById("completedCount").innerText = data.total_completed || 0;
                 }
             } catch (err) {
                 console.error("Completed count error:", err);
@@ -290,10 +325,12 @@
             }
         }
 
-        // Start tracking
-        setInterval(sendLocation, 5000);
-        sendLocation(); // Initial call
-        updateCompletedCount(); // Initial count
+        // Initialize
+        initMap().then(() => {
+            setInterval(sendLocation, 5000);
+            sendLocation();
+            updateCompletedCount();
+        });
     </script>
 
 </body>

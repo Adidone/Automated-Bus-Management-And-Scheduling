@@ -17,7 +17,7 @@ const GetETA = async (req, res) => {
 
         const { latitude, longitude } = driverRes.rows[0];
 
-        // 2️⃣ Get next INCOMPLETE stop
+        // 2️⃣ Get the NEXT incomplete stop by stop_order (simple!)
         const stopRes = await pool.query(
             `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
@@ -34,7 +34,8 @@ const GetETA = async (req, res) => {
                 success: true,
                 message: "All stops completed!",
                 next_stop: "Route Complete",
-                eta_minutes: 0
+                eta_minutes: 0,
+                distance_km: 0
             });
         }
 
