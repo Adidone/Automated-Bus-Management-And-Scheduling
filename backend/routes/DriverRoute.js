@@ -8,7 +8,7 @@ const GetETA = require("../controllers/Driver/GetEta.js");
 const ResetRoute = require("../controllers/Driver/ResetRoute.js");
 const GetCompletedStops = require("../controllers/Driver/GetCompletedStops.js");
 const GetLiveLocations = require("../controllers/Driver/GetLiveLocations.js");
-const ClearCompletedStops = require("../controllers/Driver/ClearCompletedStops.js");
+const ClearLocation = require("../controllers/Driver/ClearLocation.js");
 const router = express.Router();
 
 router.post("/add",AddDriver);
@@ -19,6 +19,6 @@ router.get("/eta/:driverId", GetETA);
 router.post("/reset-route", ResetRoute);
 router.get("/completed-stops/:driverId", GetCompletedStops);
 router.get("/location/:driverId", GetLiveLocations);
-router.get("/clear-completed-stops/:driverId", ClearCompletedStops);
+router.post("/clear-location", ClearLocation);
 
 module.exports = router;
