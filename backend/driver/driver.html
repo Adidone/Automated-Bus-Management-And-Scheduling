@@ -72,6 +72,15 @@
             background: #ee3344;
         }
 
+        #debugBtn {
+            background: #3742fa;
+            color: white;
+        }
+
+        #debugBtn:hover {
+            background: #2e3bde;
+        }
+
         #infoBox {
             padding: 15px;
             background: white;
@@ -107,6 +116,21 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             z-index: 1000;
             font-size: 14px;
+        }
+
+        #debugInfo {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
         }
 
         .status-dot {
@@ -239,6 +263,7 @@
     <div id="controls">
         <button id="resetBtn" onclick="resetRoute()">🔄 Reset Route</button>
         <button id="completedBtn" onclick="showCompleted()">✅ View Completed</button>
+        <button id="debugBtn" onclick="toggleDebug()">🔍 Debug GPS</button>
         <button id="logoutBtn" onclick="showLogoutModal()">🚪 Logout & Clear</button>
     </div>
 
@@ -255,6 +280,10 @@
     <div id="status">
         <span class="status-dot active" id="statusDot"></span>
         <span id="statusText">Live Tracking Active</span>
+    </div>
+
+    <div id="debugInfo">
+        <div id="debugContent">Debug info will appear here...</div>
     </div>
 
     <div id="map"></div>
@@ -290,11 +319,13 @@
         let watchId = null;
         let lastUpdateTime = Date.now();
         let lastPosition = null;
+        let debugMode = false;
+        let currentLocationMarker = null;
 
         // ORS API KEY
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // 📍 Haversine formula
+        // 🔍 Haversine formula
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -379,7 +410,7 @@
             stops.forEach((stop, i) => {
                 L.marker([stop.latitude, stop.longitude])
                     .addTo(map)
-                    .bindPopup(`<b>Stop ${i + 1}</b>`);
+                    .bindPopup(`<b>Stop ${i + 1}</b><br>${stop.name || 'Bus Stop'}`);
             });
 
             drawRoute();
@@ -426,11 +457,50 @@
             }
         }
 
-        // 🚀 Handle Location Update
+        function updateDebugInfo(info) {
+            if (debugMode) {
+                const debugDiv = document.getElementById('debugContent');
+                debugDiv.innerHTML = `
+                    <strong>🔍 GPS Debug Info:</strong><br>
+                    Lat: ${info.latitude.toFixed(6)}<br>
+                    Lng: ${info.longitude.toFixed(6)}<br>
+                    Accuracy: ±${info.accuracy.toFixed(1)}m<br>
+                    Speed: ${info.speed ? (info.speed * 3.6).toFixed(1) : '0'} km/h<br>
+                    Altitude: ${info.altitude ? info.altitude.toFixed(1) + 'm' : 'N/A'}<br>
+                    Heading: ${info.heading ? info.heading.toFixed(1) + '°' : 'N/A'}<br>
+                    Time: ${new Date().toLocaleTimeString()}<br>
+                    <br>
+                    <strong>Marker Position:</strong><br>
+                    [${info.latitude.toFixed(6)}, ${info.longitude.toFixed(6)}]<br>
+                    <br>
+                    ${info.nextStop ? `<strong>Next Stop:</strong><br>
+                    Name: ${info.nextStop.name}<br>
+                    Distance: ${info.nextStop.distance.toFixed(3)} km<br>
+                    [${info.nextStop.lat.toFixed(6)}, ${info.nextStop.lng.toFixed(6)}]` : ''}
+                `;
+            }
+        }
+
+        function toggleDebug() {
+            debugMode = !debugMode;
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.style.display = debugMode ? 'block' : 'none';
+        }
+
+        // 🚀 Handle Location Update - FIXED VERSION
         function handleLocationUpdate(position) {
-            const { latitude, longitude, speed, accuracy } = position.coords;
+            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
             const now = Date.now();
             const timeSinceLastUpdate = (now - lastUpdateTime) / 1000;
+
+            // Log GPS coordinates to console for debugging
+            console.log('📍 GPS Position Received:', {
+                latitude: latitude,
+                longitude: longitude,
+                accuracy: accuracy,
+                speed: speed,
+                timestamp: new Date().toLocaleTimeString()
+            });
 
             lastUpdateTime = now;
             document.getElementById("statusDot").className = "status-dot active";
@@ -448,14 +518,30 @@
 
             lastPosition = { latitude, longitude };
 
+            // CRITICAL FIX: Ensure coordinates are in correct [lat, lng] format for Leaflet
             const position_coords = [latitude, longitude];
+            
+            console.log('🚌 Setting bus marker at:', position_coords);
+
+            // Create or update bus marker
             if (!busMarker) {
-                busMarker = L.marker(position_coords, { icon: busIcon }).addTo(map).bindPopup("🚌 Your Bus");
-                map.setView(position_coords, 14);
+                busMarker = L.marker(position_coords, { icon: busIcon })
+                    .addTo(map)
+                    .bindPopup("🚌 Your Bus<br>Live Location");
+                
+                // Center map on first position
+                map.setView(position_coords, 15);
+                console.log('✅ Bus marker created at:', position_coords);
             } else {
+                // Update existing marker position
                 busMarker.setLatLng(position_coords);
+                console.log('✅ Bus marker updated to:', position_coords);
+                
+                // Optionally recenter map on bus (uncomment if you want continuous centering)
+                // map.panTo(position_coords);
             }
 
+            // Calculate distance and ETA to next stop
             if (nextStopData && nextStopData.lat && nextStopData.lng) {
                 const distance = calculateDistance(
                     latitude, longitude,
@@ -467,8 +553,24 @@
                 document.getElementById("eta").innerText = eta;
                 document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
                 document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
+
+                // Update debug info
+                updateDebugInfo({
+                    latitude, longitude, accuracy, speed, altitude, heading,
+                    nextStop: {
+                        name: nextStopData.name,
+                        lat: nextStopData.lat,
+                        lng: nextStopData.lng,
+                        distance: distance
+                    }
+                });
+            } else {
+                updateDebugInfo({
+                    latitude, longitude, accuracy, speed, altitude, heading
+                });
             }
 
+            // Send location to server every 2 seconds
             if (timeSinceLastUpdate >= 2) {
                 fetch("/driver/update-location", {
                     method: "POST",
@@ -492,6 +594,8 @@
             document.getElementById("statusDot").className = "status-dot stale";
             document.getElementById("statusText").innerText = "GPS Error";
             document.getElementById("gpsInfo").innerText = `Error: ${error.message}`;
+            
+            alert(`GPS Error: ${error.message}\n\nPlease ensure:\n1. Location services are enabled\n2. Browser has permission to access location\n3. You're not using a VPN that blocks location`);
         }
 
         function startTracking() {
@@ -502,7 +606,7 @@
                     {
                         enableHighAccuracy: true,
                         maximumAge: 0,
-                        timeout: 5000
+                        timeout: 10000
                     }
                 );
                 console.log("✅ Continuous GPS tracking started");
@@ -515,7 +619,7 @@
             if (watchId !== null) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
-                console.log("⏹️ GPS tracking stopped");
+                console.log("ℹ️ GPS tracking stopped");
             }
         }
 
