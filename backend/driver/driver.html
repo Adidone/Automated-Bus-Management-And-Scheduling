@@ -2,7 +2,7 @@
 <html>
 
 <head>
-    <title>Driver Live Tracking 1</title>
+    <title>Driver Live Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         * {
@@ -112,6 +112,11 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
+        .updating {
+            color: #667eea;
+            font-size: 12px;
+        }
     </style>
 </head>
 
@@ -127,7 +132,8 @@
         <b>Next Stop:</b> <span id="nextStop">Loading...</span><br>
         <b>ETA:</b> <span id="eta">--</span> mins<br>
         <b>Distance:</b> <span id="distance">--</span> km<br>
-        <b>Completed:</b> <span id="completedCount">0</span> stops
+        <b>Completed:</b> <span id="completedCount">0</span> stops<br>
+        <span class="updating" id="updateStatus">Initializing...</span>
     </div>
 
     <div id="status">
@@ -141,47 +147,88 @@
 
     <script>
         const driver_id = 3;
-        const route_id = 4; // Your route ID
+        const route_id = 4;
 
         let stops = [];
         let map = null;
+        let nextStopData = null;
+        let updateCount = 0;
 
         // ORS API KEY
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
+        // 📍 Haversine formula for accurate distance calculation
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Distance in km
+        }
+
+        // ⏱️ Estimate ETA based on distance
+        function estimateETA(distanceKm, avgSpeedKmh = 30) {
+            // Average city bus speed: 30 km/h
+            const hours = distanceKm / avgSpeedKmh;
+            const minutes = hours * 60;
+            return Math.max(1, Math.round(minutes)); // Minimum 1 minute
+        }
+
+        // 🎯 Get Next Stop from Backend (only when needed)
+        async function fetchNextStop() {
+            try {
+                const res = await fetch(`/driver/eta/${driver_id}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    nextStopData = {
+                        name: data.next_stop,
+                        lat: data.next_stop_lat,
+                        lng: data.next_stop_lng,
+                        order: data.stop_order
+                    };
+                    document.getElementById("nextStop").innerText = data.next_stop;
+                }
+            } catch (err) {
+                console.error("Fetch next stop error:", err);
+            }
+        }
+
         // Initialize Map and Load Stops
         async function initMap() {
-            // Fetch stops from backend
             try {
                 const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
                 
                 if (data.success && data.stops) {
-                    stops = data.stops.map(s => [s.latitude, s.longitude]);
+                    stops = data.stops;
                 } else {
-                    // Fallback to hardcoded stops if API fails
                     stops = [
-                        [16.57865479, 74.29502221],
-                        [16.58377964, 74.30980429],
-                        [16.62039870, 74.29770568],
-                        [16.63783643, 74.27932786],
-                        [16.65451617, 74.26181243]
+                        {latitude: 16.57865479, longitude: 74.29502221},
+                        {latitude: 16.58377964, longitude: 74.30980429},
+                        {latitude: 16.62039870, longitude: 74.29770568},
+                        {latitude: 16.63783643, longitude: 74.27932786},
+                        {latitude: 16.65451617, longitude: 74.26181243}
                     ];
                 }
             } catch (err) {
                 console.error("Error fetching stops:", err);
-                // Use fallback stops
                 stops = [
-                    [16.57865479, 74.29502221],
-                    [16.58377964, 74.30980429],
-                    [16.62039870, 74.29770568],
-                    [16.63783643, 74.27932786],
-                    [16.65451617, 74.26181243]
+                    {latitude: 16.57865479, longitude: 74.29502221},
+                    {latitude: 16.58377964, longitude: 74.30980429},
+                    {latitude: 16.62039870, longitude: 74.29770568},
+                    {latitude: 16.63783643, longitude: 74.27932786},
+                    {latitude: 16.65451617, longitude: 74.26181243}
                 ];
             }
 
             // Create map
-            map = L.map('map').setView(stops[0], 12);
+            const firstStop = stops[0];
+            map = L.map('map').setView([firstStop.latitude, firstStop.longitude], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
@@ -189,7 +236,9 @@
 
             // Add stop markers
             stops.forEach((stop, i) => {
-                L.marker(stop).addTo(map).bindPopup(`<b>Stop ${i + 1}</b>`);
+                L.marker([stop.latitude, stop.longitude])
+                    .addTo(map)
+                    .bindPopup(`<b>Stop ${i + 1}</b>`);
             });
 
             // Draw route
@@ -199,18 +248,19 @@
         // Draw Route
         async function drawRoute() {
             try {
+                const coords = stops.map(s => [s.longitude, s.latitude]);
                 const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
                     method: "POST",
                     headers: {
                         "Authorization": apiKey,
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({ coordinates: stops.map(s => [s[1], s[0]]) })
+                    body: JSON.stringify({ coordinates: coords })
                 });
 
                 const data = await res.json();
-                const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                L.polyline(coords, { color: "#667eea", weight: 5 }).addTo(map);
+                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
             } catch (err) {
                 console.error("Route drawing error:", err);
             }
@@ -222,22 +272,6 @@
             iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61231.png",
             iconSize: [40, 40]
         });
-
-        // Get ETA from backend
-        async function updateETA() {
-            try {
-                const res = await fetch(`/driver/eta/${driver_id}`);
-                const data = await res.json();
-
-                if (data.success) {
-                    document.getElementById("nextStop").innerText = data.next_stop || "Loading...";
-                    document.getElementById("eta").innerText = data.eta_minutes || "--";
-                    document.getElementById("distance").innerText = data.distance_km || "--";
-                }
-            } catch (err) {
-                console.error("ETA error:", err);
-            }
-        }
 
         // Update completed count
         async function updateCompletedCount() {
@@ -252,12 +286,13 @@
             }
         }
 
-        // Send Location + Update Map
+        // 🚀 FAST Location Update (runs every 2 seconds)
         function sendLocation() {
             navigator.geolocation.getCurrentPosition(pos => {
                 const { latitude, longitude } = pos.coords;
                 const position = [latitude, longitude];
 
+                // Update bus marker on map
                 if (!busMarker) {
                     busMarker = L.marker(position, { icon: busIcon }).addTo(map).bindPopup("🚌 You");
                     map.setView(position, 14);
@@ -265,6 +300,20 @@
                     busMarker.setLatLng(position);
                 }
 
+                // Calculate ETA locally (INSTANT - no API call!)
+                if (nextStopData && nextStopData.lat && nextStopData.lng) {
+                    const distance = calculateDistance(
+                        latitude, longitude,
+                        nextStopData.lat, nextStopData.lng
+                    );
+                    const eta = estimateETA(distance);
+                    
+                    document.getElementById("distance").innerText = distance.toFixed(2);
+                    document.getElementById("eta").innerText = eta;
+                    document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
+                }
+
+                // Send location to backend (for stop completion detection)
                 fetch("/driver/update-location", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -275,12 +324,22 @@
                     if (data.completed_stops && data.completed_stops.length > 0) {
                         console.log("✅ Completed:", data.completed_stops);
                         updateCompletedCount();
+                        fetchNextStop(); // Refresh next stop only when completed
                     }
-                });
+                })
+                .catch(err => console.error("Location update error:", err));
 
-                updateETA();
+                // Refresh next stop from backend every 30 seconds (for accuracy)
+                updateCount++;
+                if (updateCount >= 15) { // 15 * 2 seconds = 30 seconds
+                    fetchNextStop();
+                    updateCount = 0;
+                }
 
-            }, console.error, {
+            }, (err) => {
+                console.error("Geolocation error:", err);
+                document.getElementById("updateStatus").innerText = "GPS error";
+            }, {
                 enableHighAccuracy: true,
                 timeout: 10000,
                 maximumAge: 0
@@ -300,7 +359,7 @@
                 const data = await res.json();
                 alert(data.message);
                 updateCompletedCount();
-                updateETA();
+                fetchNextStop();
             } catch (err) {
                 alert("Error resetting route");
             }
@@ -325,10 +384,11 @@
             }
         }
 
-        // Initialize
+        // 🚀 Initialize Everything
         initMap().then(() => {
-            setInterval(sendLocation, 5000);
-            sendLocation();
+            fetchNextStop(); // Get first stop
+            setInterval(sendLocation, 2000); // Update every 2 seconds
+            sendLocation(); // Initial call
             updateCompletedCount();
         });
     </script>
