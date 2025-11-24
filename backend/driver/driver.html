@@ -126,6 +126,7 @@
     <div id="controls">
         <button id="resetBtn" onclick="resetRoute()">🔄 Reset Route</button>
         <button id="completedBtn" onclick="showCompleted()">✅ View Completed</button>
+        <button id="logoutBtn" onclick="logOut()">LogOut</button>
     </div>
 
     <div id="infoBox">
@@ -381,6 +382,17 @@
                 }
             } catch (err) {
                 alert("Error fetching completed stops");
+            }
+        }
+
+        async function logOut(){
+            try{
+                const res = await fetch(`/clear-completed-stops/${driver_id}`)
+                const data = await res.json();
+                alert(data.message)
+            }
+            catch(err){
+                alert("Error fetching Logout");
             }
         }
 
