@@ -17,13 +17,13 @@ const GetETA = async (req, res) => {
 
         const { latitude, longitude } = driverRes.rows[0];
 
-        // 2️⃣ Get the NEXT incomplete stop by stop_order (simple!)
+        // 2️⃣ Get the NEXT incomplete stop by stop_order
         const stopRes = await pool.query(
             `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
              JOIN stops s ON rs.stop_id = s.id
-             LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1 AND rs.route_id=4
-             WHERE cs.stop_id IS NULL
+             LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1
+             WHERE rs.route_id = 4 AND cs.stop_id IS NULL
              ORDER BY rs.stop_order ASC
              LIMIT 1`,
             [driver_id]
@@ -68,7 +68,9 @@ const GetETA = async (req, res) => {
             next_stop: nextStop.name,
             stop_order: nextStop.stop_order,
             eta_minutes: etaMinutes,
-            distance_km: distanceKm
+            distance_km: distanceKm,
+            next_stop_lat: nextStop.latitude,
+            next_stop_lng: nextStop.longitude
         });
 
     } catch (err) {

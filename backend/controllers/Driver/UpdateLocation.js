@@ -22,19 +22,19 @@ const UpdateLocation = async (req, res) => {
             [driver_id, latitude, longitude]
         );
 
-        // 2️⃣ Get all incomplete stops for this driver
+        // 2️⃣ Get all incomplete stops for route 4
         const stopsRes = await pool.query(
             `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
              JOIN stops s ON rs.stop_id = s.id
              LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1
-             WHERE cs.stop_id IS NULL
+             WHERE rs.route_id = 4 AND cs.stop_id IS NULL
              ORDER BY rs.stop_order ASC`,
             [driver_id]
         );
 
         // 3️⃣ Check proximity to each incomplete stop
-        const PROXIMITY_THRESHOLD = 0.002; // ~50 meters
+        const PROXIMITY_THRESHOLD = 0.002; // ~200 meters
         let completedStops = [];
 
         for (let stop of stopsRes.rows) {
@@ -42,7 +42,7 @@ const UpdateLocation = async (req, res) => {
             const lngDiff = stop.longitude - longitude;
             const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 
-            // If driver is within 50m of this stop, mark as completed
+            // If driver is within 200m of this stop, mark as completed
             if (distance <= PROXIMITY_THRESHOLD) {
                 await pool.query(
                     `INSERT INTO completed_stops (driver_id, stop_id, completed_at)
