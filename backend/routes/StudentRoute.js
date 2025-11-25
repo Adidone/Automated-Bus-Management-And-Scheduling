@@ -7,4 +7,4 @@ const router = express.Router();
 router.post("/add",AddStudent);
 router.post("/mark-attendance", MarkAttendance);
 
-module.exports = AddStudent;
+module.exports = router;
