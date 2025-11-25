@@ -55,6 +55,57 @@ const UpdateLocation = async (req, res) => {
             }
         }
 
+        // Check if all stops completed
+        const totalStops = await pool.query(
+            "SELECT COUNT(*) FROM route_stops WHERE route_id = $1",
+            [route_id]
+        );
+
+        const completedStopss = await pool.query(
+            "SELECT COUNT(*) FROM completed_stops WHERE driver_id = $1",
+            [driver_id]
+        );
+
+        if (parseInt(completedStopss.rows[0].count) === parseInt(totalStops.rows[0].count)) {
+
+            console.log("🚀 Trip Completed Automatically!");
+
+            // Fetch attendance summary
+            const attendanceSummary = await pool.query(`
+        SELECT 
+            COUNT(*) AS total_students,
+            COUNT(*) FILTER (WHERE is_coming = TRUE) AS present_students,
+            COUNT(*) FILTER (WHERE is_coming = FALSE) AS absent_students
+        FROM student_attendance
+        WHERE date = CURRENT_DATE;
+    `);
+
+            const summary = attendanceSummary.rows[0];
+
+            // Save trip report
+            await pool.query(`
+        INSERT INTO trip_history 
+        (driver_id, route_id, shift, total_students, present_students, absent_students, completed_stops)
+        VALUES ($1, $2, $3, $4, $5, $6, $7);
+    `, [
+                driver_id,
+                route_id,
+                shift,
+                summary.total_students,
+                summary.present_students,
+                summary.absent_students,
+                completedStops.rows[0].count
+            ]);
+
+            // Clear attendance + completed stops
+            await pool.query("DELETE FROM todays_attendance;");
+            await pool.query("DELETE FROM student_attendance;");
+            await pool.query("DELETE FROM completed_stops WHERE driver_id = $1;", [driver_id]);
+
+            console.log("🧹 Auto-cleared all tables after trip completion!");
+        }
+
+
         return res.status(200).json({
             message: "Location updated",
             success: true,
