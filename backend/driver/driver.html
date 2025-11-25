@@ -372,7 +372,8 @@
     <script>
         const driver_id = 3;
         const route_id = 4;
-        const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
+        // const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
+        const shift = 'Morning';
 
         let stops = [];
         let stopsWithStudents = [];
@@ -386,6 +387,7 @@
         let debugMode = false;
         let busMarker = null;
         let accuracyCircle = null;
+        
 
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
@@ -413,7 +415,7 @@
         async function fetchStopsWithStudents() {
             try {
                 console.log('🔃 Fetching student counts...');
-                const res = await fetch(`/driver/stop-student-count?driver_id=${driver_id}&shift=${shift}`);
+                const res = await fetch(`/driver/stop-student-count?driver_id=${3}&shift=${shift}`);
                 const data = await res.json();
                 
                 if (data.success) {
