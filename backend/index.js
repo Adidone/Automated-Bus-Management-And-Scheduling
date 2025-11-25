@@ -72,7 +72,7 @@ app.get("/", (req, res) => {
         <h3>Available Routes:</h3>
         <ul style="list-style: none;">
           <li><a href="/driver.html">🚗 Driver Tracking</a></li>
-          <li><a href="/admin">👨‍💼 Admin Panel</a></li>
+          <li><a href="/student-tracking.html">👨‍💼 Student Tracking</a></li>
           <li><a href="/attendance.html">👨‍🎓 Student Portal</a></li>
         </ul>
       </body>

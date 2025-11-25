@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Live Driver Tracking</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #eef2f3;
+        }
+
+        h2 {
+            text-align: center;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            margin: 0;
+        }
+
+        #infoBox {
+            padding: 15px;
+            background: white;
+            margin: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            width: 100%;
+            height: calc(100vh - 200px);
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        #refreshBtn {
+            width: 100%;
+            padding: 10px;
+            background: #1abc9c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        #refreshBtn:hover {
+            background: #16a085;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>🚌 Student Bus Tracking</h2>
+
+<div id="infoBox">
+    <div><span class="info-label">Driver:</span> <span id="driverName">Loading...</span></div>
+    <div><span class="info-label">Route:</span> <span id="routeName">Loading...</span></div>
+    <div><span class="info-label">Next Stop:</span> <span id="nextStop">Loading...</span></div>
+    <div><span class="info-label">ETA:</span> <span id="eta">--</span> mins</div>
+
+    <button id="refreshBtn" onclick="fetchTracking()">🔃 Refresh</button>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    const student_id = 1;  // <-- replace from login when needed
+    let map;
+    let driverMarker = null;
+    let stopsLayer = [];
+    let routeLine = null;
+
+    function initMap() {
+        map = L.map('map').setView([16.7, 74.25], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI/180;
+        const dLon = (lon2 - lon1) * Math.PI/180;
+
+        const a = Math.sin(dLat/2)**2 +
+                  Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+                  Math.sin(dLon/2)**2;
+
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    function estimateETA(distanceKm) {
+        return Math.max(1, Math.round((distanceKm / 30) * 60)); // assume 30 km/h
+    }
+
+    async function fetchTracking() {
+        const res = await fetch(`/student/live-tracking/${student_id}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            alert("Unable to load tracking data");
+            return;
+        }
+
+        document.getElementById("driverName").innerText = data.trip.driver_name;
+        document.getElementById("routeName").innerText = data.trip.route_id;
+
+        // === DRIVER LOCATION ===
+        if (data.driver_location) {
+            const lat = Number(data.driver_location.latitude);
+            const lon = Number(data.driver_location.longitude);
+
+            if (!driverMarker) {
+                driverMarker = L.marker([lat, lon], {
+                    icon: L.divIcon({
+                        className: '',
+                        html: `<div style="
+                            width: 20px; height: 20px;
+                            background: red;
+                            border: 3px solid white;
+                            border-radius: 50%;
+                            box-shadow: 0 0 10px rgba(255,0,0,0.7);
+                        "></div>`
+                    })
+                }).addTo(map);
+            } else {
+                driverMarker.setLatLng([lat, lon]);
+            }
+
+            map.setView([lat, lon], 14);
+        }
+
+        // === STOPS ===
+        stopsLayer.forEach(m => map.removeLayer(m));
+        stopsLayer = [];
+
+        if (data.stops) {
+            data.stops.forEach(stop => {
+                const marker = L.marker([stop.latitude, stop.longitude])
+                    .addTo(map)
+                    .bindPopup(stop.name);
+                stopsLayer.push(marker);
+            });
+        }
+
+        // === NEXT STOP ===
+        if (data.next_stop) {
+            const ns = data.next_stop;
+            document.getElementById("nextStop").innerText = ns.name;
+
+            if (data.driver_location) {
+                const dist = calculateDistance(
+                    Number(data.driver_location.latitude),
+                    Number(data.driver_location.longitude),
+                    Number(ns.latitude),
+                    Number(ns.longitude)
+                );
+                document.getElementById("eta").innerText = estimateETA(dist);
+            }
+        }
+    }
+
+    initMap();
+    fetchTracking();
+    setInterval(fetchTracking, 5000); // live update every 5 sec
+</script>
+
+</body>
+</html>
