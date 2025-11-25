@@ -1,310 +1,55 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>Driver Live Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
-
-        h2 {
-            text-align: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            margin: 0;
-            font-size: 1.8em;
-        }
-
-        #controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            padding: 10px;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 600;
-        }
-
-        #resetBtn {
-            background: #ffa502;
-            color: white;
-        }
-
-        #resetBtn:hover {
-            background: #ff7f00;
-        }
-
-        #completedBtn {
-            background: #2ed573;
-            color: white;
-        }
-
-        #completedBtn:hover {
-            background: #26de81;
-        }
-
-        #refreshBtn {
-            background: #1abc9c;
-            color: white;
-        }
-
-        #refreshBtn:hover {
-            background: #16a085;
-        }
-
-        #logoutBtn {
-            background: #ff4757;
-            color: white;
-        }
-
-        #logoutBtn:hover {
-            background: #ee3344;
-        }
-
-        #debugBtn {
-            background: #3742fa;
-            color: white;
-        }
-
-        #debugBtn:hover {
-            background: #2e3bde;
-        }
-
-        #infoBox {
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            width: 340px;
-            margin: 15px auto;
-            font-size: 16px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        #infoBox b {
-            color: #667eea;
-        }
-
-        #infoBox span {
-            color: #333;
-            font-weight: 600;
-        }
-
-        #studentCount {
-            font-size: 28px;
-            font-weight: bold;
-        }
-
-        .skip-warning {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            padding: 8px;
-            border-radius: 5px;
-            margin-top: 8px;
-            text-align: center;
-            font-weight: bold;
-            color: #856404;
-            font-size: 13px;
-        }
-
-        #map {
-            width: 100%;
-            height: calc(100vh - 280px);
-            border-top: 3px solid #667eea;
-        }
-
-        #status {
-            position: absolute;
-            top: 80px;
-            right: 20px;
-            background: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            font-size: 14px;
-        }
-
-        #legend {
-            position: absolute;
-            top: 80px;
-            left: 20px;
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            font-size: 12px;
-        }
-
-        #legend h4 {
-            margin: 0 0 10px 0;
-            color: #333;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin: 5px 0;
-        }
-
-        .legend-dot {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            margin-right: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 11px;
-        }
-
-        #debugInfo {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #0f0;
-            padding: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 11px;
-            z-index: 1000;
-            max-width: 300px;
-            max-height: 400px;
-            overflow-y: auto;
-            display: none;
-        }
-
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-            margin-right: 8px;
-        }
-
-        .status-dot.active {
-            background: #2ed573;
-        }
-
-        .status-dot.stale {
-            background: #ff4757;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .updating {
-            color: #667eea;
-            font-size: 12px;
-        }
-
-        .gps-info {
-            color: #999;
-            font-size: 11px;
-            margin-top: 5px;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 10000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.3s;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 20% auto;
-            padding: 30px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        }
-
-        .modal-content h3 {
-            color: #333;
-            margin-bottom: 15px;
-        }
-
-        .modal-content p {
-            color: #666;
-            margin-bottom: 20px;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .modal-btn {
-            padding: 10px 25px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .modal-btn.confirm {
-            background: #ff4757;
-            color: white;
-        }
-
-        .modal-btn.confirm:hover {
-            background: #ee3344;
-        }
-
-        .modal-btn.cancel {
-            background: #ddd;
-            color: #333;
-        }
-
-        .modal-btn.cancel:hover {
-            background: #ccc;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        h2 { text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin: 0; font-size: 1.8em; }
+        #controls { display: flex; justify-content: center; gap: 10px; padding: 10px; background: white; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); flex-wrap: wrap; }
+        button { padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; transition: all 0.3s; font-weight: 600; }
+        #resetBtn { background: #ffa502; color: white; }
+        #resetBtn:hover { background: #ff7f00; }
+        #completedBtn { background: #2ed573; color: white; }
+        #completedBtn:hover { background: #26de81; }
+        #refreshBtn { background: #1abc9c; color: white; }
+        #refreshBtn:hover { background: #16a085; }
+        #logoutBtn { background: #ff4757; color: white; }
+        #logoutBtn:hover { background: #ee3344; }
+        #debugBtn { background: #3742fa; color: white; }
+        #debugBtn:hover { background: #2e3bde; }
+        #infoBox { padding: 15px; background: white; border-radius: 8px; width: 340px; margin: 15px auto; font-size: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        #infoBox b { color: #667eea; }
+        #infoBox span { color: #333; font-weight: 600; }
+        #studentCount { font-size: 28px; font-weight: bold; }
+        .skip-warning { background: #fff3cd; border: 2px solid #ffc107; padding: 8px; border-radius: 5px; margin-top: 8px; text-align: center; font-weight: bold; color: #856404; font-size: 13px; }
+        #map { width: 100%; height: calc(100vh - 280px); border-top: 3px solid #667eea; }
+        #status { position: absolute; top: 80px; right: 20px; background: white; padding: 10px 15px; border-radius: 5px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); z-index: 1000; font-size: 14px; }
+        #legend { position: absolute; top: 80px; left: 20px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); z-index: 1000; font-size: 12px; }
+        #legend h4 { margin: 0 0 10px 0; color: #333; }
+        .legend-item { display: flex; align-items: center; margin: 5px 0; }
+        .legend-dot { width: 20px; height: 20px; border-radius: 50%; margin-right: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; }
+        #debugInfo { position: absolute; bottom: 20px; left: 20px; background: rgba(0, 0, 0, 0.8); color: #0f0; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 11px; z-index: 1000; max-width: 300px; max-height: 400px; overflow-y: auto; display: none; }
+        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; animation: pulse 2s infinite; margin-right: 8px; }
+        .status-dot.active { background: #2ed573; }
+        .status-dot.stale { background: #ff4757; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .updating { color: #667eea; font-size: 12px; }
+        .gps-info { color: #999; font-size: 11px; margin-top: 5px; }
+        .modal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { background-color: white; margin: 20% auto; padding: 30px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+        .modal-content h3 { color: #333; margin-bottom: 15px; }
+        .modal-content p { color: #666; margin-bottom: 20px; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { padding: 10px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.3s; }
+        .modal-btn.confirm { background: #ff4757; color: white; }
+        .modal-btn.confirm:hover { background: #ee3344; }
+        .modal-btn.cancel { background: #ddd; color: #333; }
+        .modal-btn.cancel:hover { background: #ccc; }
     </style>
 </head>
-
 <body>
     <h2>🚌 Driver Live Tracking</h2>
 
@@ -355,7 +100,6 @@
 
     <div id="map"></div>
 
-    <!-- Logout Modal -->
     <div id="logoutModal" class="modal">
         <div class="modal-content">
             <h3>⚠️ Confirm Logout</h3>
@@ -370,8 +114,12 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
+        // ✅ CHANGE THIS TO YOUR DRIVER ID (from database)
         const driver_id = 3;
-        const route_id = 4;
+        
+        // ✅ This will be fetched dynamically now
+        let route_id = null;
+        
         const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
 
         let stops = [];
@@ -389,7 +137,28 @@
 
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // Haversine formula
+        // ✅ NEW: Get driver's route_id first
+        async function getDriverRoute() {
+            try {
+                console.log('🔍 Fetching driver route...');
+                const res = await fetch(`/driver/eta/${driver_id}`);
+                const data = await res.json();
+                
+                if (data.success && data.route_id) {
+                    route_id = data.route_id;
+                    console.log(`✅ Route ID: ${route_id}`);
+                    return route_id;
+                } else {
+                    console.error('❌ No route assigned');
+                    alert('No route assigned to this driver!');
+                    return null;
+                }
+            } catch (err) {
+                console.error("Error fetching route:", err);
+                return null;
+            }
+        }
+
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -401,7 +170,6 @@
             return R * c;
         }
 
-        // Estimate ETA
         function estimateETA(distanceKm, speedKmh) {
             if (speedKmh && speedKmh > 5) {
                 return Math.max(1, Math.round((distanceKm / speedKmh) * 60));
@@ -409,31 +177,34 @@
             return Math.max(1, Math.round((distanceKm / 30) * 60));
         }
 
-        // Fetch stops with student counts
         async function fetchStopsWithStudents() {
+            if (!route_id) {
+                console.log('⏳ Waiting for route_id...');
+                return;
+            }
+            
             try {
-                console.log('🔃 Fetching student counts...');
+                console.log(`🔃 Fetching student counts for route ${route_id}...`);
                 const res = await fetch(`/driver/stop-student-count?driver_id=${driver_id}&shift=${shift}`);
                 const data = await res.json();
                 
                 if (data.success) {
                     stopsWithStudents = data.data;
-                    console.log('✅ Student counts loaded');
+                    console.log(`✅ Loaded ${stopsWithStudents.length} stops with student counts`);
                     updateMapMarkers();
                     updateNextStopStudentCount();
+                } else {
+                    console.error('❌ Failed to fetch student counts:', data.message);
                 }
             } catch (err) {
                 console.error("Error fetching student counts:", err);
             }
         }
 
-        // Update map markers with student counts
         function updateMapMarkers() {
-            // Remove old stop markers only
             stopMarkers.forEach(marker => map.removeLayer(marker));
             stopMarkers = [];
 
-            // Add new markers with counts
             stopsWithStudents.forEach((stop) => {
                 const color = stop.is_completed ? '#95a5a6' : 
                              stop.coming_today === 0 ? '#ff4757' : '#2ed573';
@@ -477,7 +248,6 @@
             });
         }
 
-        // Update student count for next stop
         function updateNextStopStudentCount() {
             if (nextStopData && stopsWithStudents.length > 0) {
                 const stopData = stopsWithStudents.find(s => 
@@ -503,11 +273,12 @@
                         countEl.style.fontSize = '28px';
                         document.getElementById("skipWarning").innerHTML = '';
                     }
+                } else {
+                    console.log('⚠️ Stop data not found for next stop');
                 }
             }
         }
 
-        // Get Next Stop
         async function fetchNextStop() {
             try {
                 const res = await fetch(`/driver/eta/${driver_id}`);
@@ -528,32 +299,29 @@
             }
         }
 
-        // Initialize Map
         async function initMap() {
+            if (!route_id) {
+                console.error('❌ Cannot initialize map without route_id');
+                return;
+            }
+            
             try {
+                console.log(`🗺️ Loading stops for route ${route_id}...`);
                 const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
                 
-                if (data.success && data.stops) {
+                if (data.success && data.stops && data.stops.length > 0) {
                     stops = data.stops;
+                    console.log(`✅ Loaded ${stops.length} stops`);
                 } else {
-                    stops = [
-                        {latitude: 16.57865479, longitude: 74.29502221},
-                        {latitude: 16.58377964, longitude: 74.30980429},
-                        {latitude: 16.62039870, longitude: 74.29770568},
-                        {latitude: 16.63783643, longitude: 74.27932786},
-                        {latitude: 16.65451617, longitude: 74.26181243}
-                    ];
+                    console.error('❌ No stops found');
+                    alert('No stops configured for this route!');
+                    return;
                 }
             } catch (err) {
                 console.error("Error fetching stops:", err);
-                stops = [
-                    {latitude: 16.57865479, longitude: 74.29502221},
-                    {latitude: 16.58377964, longitude: 74.30980429},
-                    {latitude: 16.62039870, longitude: 74.29770568},
-                    {latitude: 16.63783643, longitude: 74.27932786},
-                    {latitude: 16.65451617, longitude: 74.26181243}
-                ];
+                alert('Failed to load route stops!');
+                return;
             }
 
             const firstStop = stops[0];
@@ -585,12 +353,12 @@
                     map.removeLayer(routeLine);
                 }
                 routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+                console.log('✅ Route drawn on map');
             } catch (err) {
                 console.error("Route drawing error:", err);
             }
         }
 
-        // Bus marker icon
         const currentLocationIcon = L.divIcon({
             className: '',
             html: `<div style="
@@ -626,6 +394,8 @@
         function updateDebugInfo(info) {
             if (debugMode) {
                 document.getElementById('debugContent').innerHTML = `
+                    Driver ID: ${driver_id}<br>
+                    Route ID: ${route_id}<br>
                     GPS: ${info.latitude.toFixed(6)}, ${info.longitude.toFixed(6)}<br>
                     Accuracy: ±${info.accuracy.toFixed(1)}m<br>
                     Speed: ${info.speed ? (info.speed * 3.6).toFixed(1) : '0'} km/h<br>
@@ -640,13 +410,10 @@
             document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
         }
 
-        // Handle Location Update
         function handleLocationUpdate(position) {
-            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
+            const { latitude, longitude, speed, accuracy } = position.coords;
             const now = Date.now();
             const timeSinceLastUpdate = (now - lastUpdateTime) / 1000;
-
-            console.log('📍 GPS:', latitude, longitude, `±${accuracy}m`);
 
             lastUpdateTime = now;
             document.getElementById("statusDot").className = "status-dot active";
@@ -665,7 +432,6 @@
             lastPosition = { latitude, longitude };
             const position_coords = [latitude, longitude];
 
-            // Accuracy circle
             if (accuracyCircle) map.removeLayer(accuracyCircle);
             accuracyCircle = L.circle(position_coords, {
                 radius: accuracy,
@@ -675,7 +441,6 @@
                 weight: 1
             }).addTo(map);
 
-            // Bus marker
             if (!busMarker) {
                 busMarker = L.marker(position_coords, { icon: currentLocationIcon })
                     .addTo(map)
@@ -687,7 +452,6 @@
                 map.panTo(position_coords, { animate: true, duration: 0.5 });
             }
 
-            // Calculate ETA
             if (nextStopData && nextStopData.lat && nextStopData.lng) {
                 const distance = calculateDistance(
                     latitude, longitude,
@@ -701,12 +465,11 @@
                 document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
 
                 updateDebugInfo({
-                    latitude, longitude, accuracy, speed, altitude, heading,
+                    latitude, longitude, accuracy, speed,
                     nextStop: { name: nextStopData.name, lat: nextStopData.lat, lng: nextStopData.lng, distance }
                 });
             }
 
-            // Send to server
             if (timeSinceLastUpdate >= 2) {
                 fetch("/driver/update-location", {
                     method: "POST",
@@ -753,9 +516,14 @@
             }
         }
 
-        // Auto-refresh
-        setInterval(fetchStopsWithStudents, 60000);
-        setInterval(fetchNextStop, 30000);
+        setInterval(() => {
+            if (route_id) fetchStopsWithStudents();
+        }, 60000);
+        
+        setInterval(() => {
+            if (route_id) fetchNextStop();
+        }, 30000);
+        
         setInterval(() => {
             if ((Date.now() - lastUpdateTime) / 1000 > 10) {
                 document.getElementById("statusDot").className = "status-dot stale";
@@ -834,18 +602,41 @@
             }
         }
 
-        // Initialize
+        // ✅ INITIALIZE WITH PROPER SEQUENCE
         console.log(`🚌 Driver App - Shift: ${shift}`);
-        initMap().then(() => {
-            fetchNextStop();
-            fetchStopsWithStudents();
-            startTracking();
-            updateCompletedCount();
-        });
+        
+        async function initializeApp() {
+            try {
+                // 1. Get route_id first
+                await getDriverRoute();
+                
+                if (!route_id) {
+                    alert('❌ Cannot start: No route assigned!');
+                    return;
+                }
+                
+                // 2. Initialize map with stops
+                await initMap();
+                
+                // 3. Fetch data
+                await fetchNextStop();
+                await fetchStopsWithStudents();
+                await updateCompletedCount();
+                
+                // 4. Start tracking
+                startTracking();
+                
+                console.log('✅ App initialized successfully');
+            } catch (err) {
+                console.error('❌ Initialization error:', err);
+                alert('Failed to initialize app: ' + err.message);
+            }
+        }
 
+        initializeApp();
+        
         window.addEventListener('beforeunload', stopTracking);
     </script>
 
 </body>
-
 </html>
