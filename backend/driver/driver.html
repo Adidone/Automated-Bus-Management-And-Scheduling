@@ -31,7 +31,7 @@
             gap: 10px;
             padding: 10px;
             background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             flex-wrap: wrap;
         }
 
@@ -88,7 +88,7 @@
             width: 320px;
             margin: 15px auto;
             font-size: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         #infoBox b {
@@ -113,7 +113,7 @@
             background: white;
             padding: 10px 15px;
             border-radius: 5px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             z-index: 1000;
             font-size: 14px;
         }
@@ -122,7 +122,7 @@
             position: absolute;
             bottom: 20px;
             left: 20px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             color: #0f0;
             padding: 10px;
             border-radius: 5px;
@@ -151,8 +151,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         .updating {
@@ -173,13 +180,20 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             animation: bounce 2s infinite;
         }
 
         @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
         }
 
         /* Modal for logout confirmation */
@@ -191,13 +205,18 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0, 0, 0, 0.5);
             animation: fadeIn 0.3s;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .modal-content {
@@ -208,7 +227,7 @@
             width: 90%;
             max-width: 400px;
             text-align: center;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
         }
 
         .modal-content h3 {
@@ -269,6 +288,7 @@
 
     <div id="infoBox">
         <b>Next Stop:</b> <span id="nextStop">Loading...</span><br>
+        <b>Students Coming:</b> <span id="studentCount" style="color: #2ed573; font-size: 20px;">--</span> 👨‍🎓<br>
         <b>ETA:</b> <span id="eta">--</span> mins<br>
         <b>Distance:</b> <span id="distance">--</span> km<br>
         <b>Speed:</b> <span id="speed">--</span> km/h<br>
@@ -330,11 +350,11 @@
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
 
@@ -377,32 +397,32 @@
             try {
                 const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
-                
+
                 if (data.success && data.stops) {
                     stops = data.stops;
                 } else {
                     stops = [
-                        {latitude: 16.57865479, longitude: 74.29502221},
-                        {latitude: 16.58377964, longitude: 74.30980429},
-                        {latitude: 16.62039870, longitude: 74.29770568},
-                        {latitude: 16.63783643, longitude: 74.27932786},
-                        {latitude: 16.65451617, longitude: 74.26181243}
+                        { latitude: 16.57865479, longitude: 74.29502221 },
+                        { latitude: 16.58377964, longitude: 74.30980429 },
+                        { latitude: 16.62039870, longitude: 74.29770568 },
+                        { latitude: 16.63783643, longitude: 74.27932786 },
+                        { latitude: 16.65451617, longitude: 74.26181243 }
                     ];
                 }
             } catch (err) {
                 console.error("Error fetching stops:", err);
                 stops = [
-                    {latitude: 16.57865479, longitude: 74.29502221},
-                    {latitude: 16.58377964, longitude: 74.30980429},
-                    {latitude: 16.62039870, longitude: 74.29770568},
-                    {latitude: 16.63783643, longitude: 74.27932786},
-                    {latitude: 16.65451617, longitude: 74.26181243}
+                    { latitude: 16.57865479, longitude: 74.29502221 },
+                    { latitude: 16.58377964, longitude: 74.30980429 },
+                    { latitude: 16.62039870, longitude: 74.29770568 },
+                    { latitude: 16.63783643, longitude: 74.27932786 },
+                    { latitude: 16.65451617, longitude: 74.26181243 }
                 ];
             }
 
             const firstStop = stops[0];
             map = L.map('map').setView([firstStop.latitude, firstStop.longitude], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
             }).addTo(map);
@@ -439,7 +459,7 @@
         // 🚌 Custom Bus Icon with better visuals
         let busMarker = null;
         let accuracyCircle = null;
-        
+
         const busIcon = L.divIcon({
             className: 'bus-marker',
             html: '<svg width="50" height="50" viewBox="0 0 24 24" fill="white"><path d="M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16M6.5,17A1.5,1.5 0 0,1 5,15.5A1.5,1.5 0 0,1 6.5,14A1.5,1.5 0 0,1 8,15.5A1.5,1.5 0 0,1 6.5,17M17.5,17A1.5,1.5 0 0,1 16,15.5A1.5,1.5 0 0,1 17.5,14A1.5,1.5 0 0,1 19,15.5A1.5,1.5 0 0,1 17.5,17M6,13V6H18V13H6Z"/></svg>',
@@ -531,7 +551,7 @@
             document.getElementById("gpsInfo").innerText = `GPS: ±${accuracy.toFixed(0)}m | ${new Date().toLocaleTimeString()}`;
 
             let currentSpeed = speed ? speed * 3.6 : 0;
-            
+
             if (!speed && lastPosition) {
                 const distance = calculateDistance(
                     lastPosition.latitude, lastPosition.longitude,
@@ -544,7 +564,7 @@
 
             // CRITICAL FIX: Ensure coordinates are in correct [lat, lng] format for Leaflet
             const position_coords = [latitude, longitude];
-            
+
             console.log('🚌 Setting bus marker at:', position_coords);
 
             // Remove old accuracy circle if exists
@@ -566,7 +586,7 @@
                 busMarker = L.marker(position_coords, { icon: currentLocationIcon })
                     .addTo(map)
                     .bindPopup(`🚌 Your Current Location<br>Accuracy: ±${accuracy.toFixed(0)}m`);
-                
+
                 // Center map on first position with good zoom
                 map.setView(position_coords, 16);
                 console.log('✅ Bus marker created at:', position_coords);
@@ -575,7 +595,7 @@
                 busMarker.setLatLng(position_coords);
                 busMarker.setPopupContent(`🚌 Your Current Location<br>Accuracy: ±${accuracy.toFixed(0)}m<br>Speed: ${currentSpeed.toFixed(1)} km/h`);
                 console.log('✅ Bus marker updated to:', position_coords);
-                
+
                 // Smoothly pan to new position
                 map.panTo(position_coords, { animate: true, duration: 0.5 });
             }
@@ -587,7 +607,7 @@
                     nextStopData.lat, nextStopData.lng
                 );
                 const eta = estimateETA(distance, currentSpeed);
-                
+
                 document.getElementById("distance").innerText = distance.toFixed(2);
                 document.getElementById("eta").innerText = eta;
                 document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
@@ -616,15 +636,15 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ driver_id, latitude, longitude })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.completed_stops && data.completed_stops.length > 0) {
-                        console.log("✅ Completed:", data.completed_stops);
-                        updateCompletedCount();
-                        fetchNextStop();
-                    }
-                })
-                .catch(err => console.error("Location update error:", err));
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.completed_stops && data.completed_stops.length > 0) {
+                            console.log("✅ Completed:", data.completed_stops);
+                            updateCompletedCount();
+                            fetchNextStop();
+                        }
+                    })
+                    .catch(err => console.error("Location update error:", err));
             }
         }
 
@@ -633,7 +653,7 @@
             document.getElementById("statusDot").className = "status-dot stale";
             document.getElementById("statusText").innerText = "GPS Error";
             document.getElementById("gpsInfo").innerText = `Error: ${error.message}`;
-            
+
             alert(`GPS Error: ${error.message}\n\nPlease ensure:\n1. Location services are enabled\n2. Browser has permission to access location\n3. You're not using a VPN that blocks location`);
         }
 
@@ -696,11 +716,11 @@
             try {
                 const res = await fetch(`/driver/completed-stops/${driver_id}`);
                 const data = await res.json();
-                
+
                 if (data.completed_stops.length === 0) {
                     alert("No stops completed yet!");
                 } else {
-                    const list = data.completed_stops.map(s => 
+                    const list = data.completed_stops.map(s =>
                         `${s.stop_order}. ${s.name} - ${new Date(s.completed_at).toLocaleTimeString()}`
                     ).join('\n');
                     alert(`Completed Stops:\n\n${list}`);
@@ -732,7 +752,7 @@
                 });
 
                 const data = await res.json();
-                
+
                 if (data.success) {
                     // Clear location data
                     await fetch("/driver/clear-location", {
@@ -742,7 +762,7 @@
                     });
 
                     alert("✅ Logout successful! Data cleared.");
-                    
+
                     // Redirect to home page
                     window.location.href = "/";
                 } else {
@@ -756,19 +776,140 @@
         }
 
         // Close modal if clicked outside
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             const modal = document.getElementById('logoutModal');
             if (event.target == modal) {
                 closeLogoutModal();
             }
         }
 
-        // 🚀 Initialize
+        // Add at the top with other variables
+        let stopsWithStudents = [];
+        const shift = 'Morning'; // or 'Evening' based on time
+
+        // Fetch stops with student counts
+        async function fetchStopsWithStudents() {
+            try {
+                const res = await fetch(`/driver/stop-student-count?driver_id=${driver_id}&shift=${shift}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    stopsWithStudents = data.data;
+                    updateMapMarkers();
+                    updateNextStopStudentCount();
+                }
+            } catch (err) {
+                console.error("Error fetching student counts:", err);
+            }
+        }
+
+        // Update map markers with student counts
+        function updateMapMarkers() {
+            // Clear existing markers except bus
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker && layer !== busMarker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Add markers with student counts
+            stopsWithStudents.forEach((stop, i) => {
+                const color = stop.coming_today === 0 ? '#ff4757' :
+                    stop.is_completed ? '#95a5a6' :
+                        '#2ed573';
+
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div style="
+                background: ${color};
+                color: white;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 14px;
+                border: 3px solid white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            ">${stop.coming_today}</div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+
+                const marker = L.marker([stop.latitude, stop.longitude], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                <b>${stop.stop_name}</b><br>
+                <b style="color: #2ed573;">Coming: ${stop.coming_today}</b><br>
+                <span style="color: #ff4757;">Not Coming: ${stop.not_coming_today}</span><br>
+                Total Students: ${stop.total_students}<br>
+                ${stop.should_skip ? '⚠️ <b>May Skip</b>' : ''}
+                ${stop.is_completed ? '✅ <b>Completed</b>' : ''}
+            `);
+            });
+        }
+
+        // Update student count for next stop
+        function updateNextStopStudentCount() {
+            if (nextStopData && stopsWithStudents.length > 0) {
+                // Find the stop data
+                const stopData = stopsWithStudents.find(s =>
+                    Math.abs(s.latitude - nextStopData.lat) < 0.0001 &&
+                    Math.abs(s.longitude - nextStopData.lng) < 0.0001
+                );
+
+                if (stopData) {
+                    const countEl = document.getElementById("studentCount");
+                    countEl.innerText = stopData.coming_today;
+
+                    // Change color based on count
+                    if (stopData.coming_today === 0) {
+                        countEl.style.color = '#ff4757'; // Red for zero
+                        countEl.style.fontSize = '24px';
+                    } else if (stopData.coming_today < 3) {
+                        countEl.style.color = '#ffa502'; // Orange for few
+                        countEl.style.fontSize = '22px';
+                    } else {
+                        countEl.style.color = '#2ed573'; // Green for many
+                        countEl.style.fontSize = '20px';
+                    }
+                }
+            }
+        }
+
+        // Modify fetchNextStop to also update student count
+        async function fetchNextStop() {
+            try {
+                const res = await fetch(`/driver/eta/${driver_id}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    nextStopData = {
+                        name: data.next_stop,
+                        lat: data.next_stop_lat,
+                        lng: data.next_stop_lng,
+                        order: data.stop_order
+                    };
+                    document.getElementById("nextStop").innerText = data.next_stop;
+                    updateNextStopStudentCount(); // ⬅️ Add this
+                }
+            } catch (err) {
+                console.error("Fetch next stop error:", err);
+            }
+        }
+
+        // Initialize - add to initMap().then()
         initMap().then(() => {
             fetchNextStop();
+            fetchStopsWithStudents(); // ⬅️ Add this
             startTracking();
             updateCompletedCount();
         });
+
+        // Refresh student counts every 60 seconds
+        setInterval(fetchStopsWithStudents, 60000);
 
         window.addEventListener('beforeunload', stopTracking);
     </script>
