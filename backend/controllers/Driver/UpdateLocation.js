@@ -58,7 +58,7 @@ const UpdateLocation = async (req, res) => {
         // Check if all stops completed
         const totalStops = await pool.query(
             "SELECT COUNT(*) FROM route_stops WHERE route_id = $1",
-            [route_id]
+            [4]
         );
 
         const completedStopss = await pool.query(
