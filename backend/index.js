@@ -67,7 +67,7 @@ app.get("/", (req, res) => {
     <html>
       <head><title>Bus Management System</title></head>
       <body style="font-family: Arial; text-align: center; padding: 50px;">
-        <h1>🚌 Automated Bus Management System </h1>
+        <h1>🚌 Automated Bus Management System 1</h1>
         <p>Server is running successfully!</p>
         <h3>Available Routes:</h3>
         <ul style="list-style: none;">
