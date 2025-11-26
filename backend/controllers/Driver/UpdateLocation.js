@@ -1,70 +1,123 @@
 const pool = require("../../db");
-const calculateRoadDistanceOSRM = require("../../osrmDistance");
 
 const UpdateLocation = async (req, res) => {
     try {
         const { driver_id, latitude, longitude } = req.body;
 
         if (!driver_id || !latitude || !longitude) {
-            return res.status(400).json({ success: false, message: "Invalid data" });
+            return res.status(400).json({
+                message: "driver_id, latitude, longitude are required",
+                success: false
+            });
         }
 
-        // 1. Update driver live location
+        // 1️⃣ Update driver location
         await pool.query(
             `INSERT INTO driver_live_location (driver_id, latitude, longitude, updated_at)
              VALUES ($1, $2, $3, NOW())
              ON CONFLICT (driver_id)
-             DO UPDATE SET latitude = $2, longitude = $3, updated_at = NOW()`,
+             DO UPDATE SET latitude = EXCLUDED.latitude,
+                           longitude = EXCLUDED.longitude,
+                           updated_at = NOW();`,
             [driver_id, latitude, longitude]
         );
 
-        // 2. Get next stop
-        const nextStopRes = await pool.query(
-            `SELECT s.id, s.latitude, s.longitude, s.name, rs.stop_order
+        // 2️⃣ Get all incomplete stops for route 4
+        const stopsRes = await pool.query(
+            `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
              JOIN stops s ON rs.stop_id = s.id
              LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1
-             WHERE cs.stop_id IS NULL
-             AND rs.route_id = (SELECT route_id FROM trips WHERE driver_id = $1 LIMIT 1)
-             ORDER BY rs.stop_order ASC
-             LIMIT 1`,
+             WHERE rs.route_id = 4 AND cs.stop_id IS NULL
+             ORDER BY rs.stop_order ASC`,
             [driver_id]
         );
 
-        if (nextStopRes.rows.length === 0) {
-            return res.json({ success: true, message: "All stops already completed" });
+        // 3️⃣ Check proximity to each incomplete stop
+        const PROXIMITY_THRESHOLD = 0.0005; // ~200 meters
+        let completedStops = [];
+
+        for (let stop of stopsRes.rows) {
+            const latDiff = stop.latitude - latitude;
+            const lngDiff = stop.longitude - longitude;
+            const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+
+            // If driver is within 200m of this stop, mark as completed
+            if (distance <= PROXIMITY_THRESHOLD) {
+                await pool.query(
+                    `INSERT INTO completed_stops (driver_id, stop_id, completed_at)
+                     VALUES ($1, $2, NOW())
+                     ON CONFLICT (driver_id, stop_id) DO NOTHING`,
+                    [driver_id, stop.id]
+                );
+                completedStops.push(stop.name);
+                console.log(`✅ Stop "${stop.name}" completed by driver ${driver_id}`);
+            }
         }
 
-        const stop = nextStopRes.rows[0];
-
-        // 3. Use real distance instead of Haversine
-        const distanceData = await calculateRoadDistanceOSRM(
-            latitude, longitude,
-            stop.latitude, stop.longitude
+        // Check if all stops completed
+        const totalStops = await pool.query(
+            "SELECT COUNT(*) FROM route_stops WHERE route_id = $1",
+            [4]
         );
 
-        const distance = distanceData ? distanceData.distance : 999;
+        const completedStopss = await pool.query(
+            "SELECT COUNT(*) FROM completed_stops WHERE driver_id = $1",
+            [driver_id]
+        );
 
-        // 4. Mark stop completed if within 60 meters
-        if (distance <= 0.06) {
-            await pool.query(
-                `INSERT INTO completed_stops (driver_id, stop_id) 
-                 VALUES ($1, $2)
-                 ON CONFLICT DO NOTHING`,
-                [driver_id, stop.id]
-            );
+        if (parseInt(completedStopss.rows[0].count) === parseInt(totalStops.rows[0].count)) {
 
-            return res.json({
-                success: true,
-                completed_stops: [{ stop_id: stop.id, stop_name: stop.name }]
-            });
+            console.log("🚀 Trip Completed Automatically!");
+
+            // Fetch attendance summary
+            const attendanceSummary = await pool.query(`
+        SELECT 
+            COUNT(*) AS total_students,
+            COUNT(*) FILTER (WHERE is_coming = TRUE) AS present_students,
+            COUNT(*) FILTER (WHERE is_coming = FALSE) AS absent_students
+        FROM student_attendance
+        WHERE date = CURRENT_DATE;
+    `);
+
+            const summary = attendanceSummary.rows[0];
+
+            // Save trip report
+            await pool.query(`
+        INSERT INTO trip_history 
+        (driver_id, route_id, shift, total_students, present_students, absent_students, completed_stops)
+        VALUES ($1, $2, $3, $4, $5, $6, $7);
+    `, [
+                driver_id,
+                route_id,
+                shift,
+                summary.total_students,
+                summary.present_students,
+                summary.absent_students,
+                completedStops.rows[0].count
+            ]);
+
+            // Clear attendance + completed stops
+            await pool.query("DELETE FROM todays_attendance;");
+            await pool.query("DELETE FROM student_attendance;");
+            await pool.query("DELETE FROM completed_stops WHERE driver_id = $1;", [driver_id]);
+
+            console.log("🧹 Auto-cleared all tables after trip completion!");
         }
 
-        return res.json({ success: true, completed_stops: [] });
+
+        return res.status(200).json({
+            message: "Location updated",
+            success: true,
+            completed_stops: completedStops
+        });
 
     } catch (err) {
         console.error("UpdateLocation error:", err);
-        res.status(500).json({ success: false, message: "Internal error" });
+        return res.status(500).json({
+            message: err.message,
+            success: false
+        });
     }
 };
 

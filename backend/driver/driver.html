@@ -355,6 +355,7 @@
 
     <div id="map"></div>
 
+    <!-- Logout Modal -->
     <div id="logoutModal" class="modal">
         <div class="modal-content">
             <h3>⚠️ Confirm Logout</h3>
@@ -367,12 +368,11 @@
     </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-polyline/1.1.1/polyline.js"></script>
 
     <script>
-        // Use a static ID for testing as this would normally be stored in session/local storage after login
-        const driver_id = 3; 
+        const driver_id = 3;
         const route_id = 4;
+        // const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
         const shift = 'Morning';
 
         let stops = [];
@@ -389,21 +389,33 @@
         let accuracyCircle = null;
         
 
-        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135"; // Example ORS key, will be used if backend doesn't provide polyline
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // --- REMOVED: calculateDistance (Haversine) function ---
-        
-        // Estimate ETA - Now relies on backend duration data (seconds)
-        function estimateETA(durationSeconds) {
-            return Math.max(1, Math.round(durationSeconds / 60));
+        // Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Estimate ETA
+        function estimateETA(distanceKm, speedKmh) {
+            if (speedKmh && speedKmh > 5) {
+                return Math.max(1, Math.round((distanceKm / speedKmh) * 60));
+            }
+            return Math.max(1, Math.round((distanceKm / 30) * 60));
         }
 
         // Fetch stops with student counts
         async function fetchStopsWithStudents() {
             try {
                 console.log('🔃 Fetching student counts...');
-                // Assuming backend API endpoint is correctly mapped in Express
-                const res = await fetch(`/driver/stop-student-count?driver_id=${driver_id}&shift=${shift}`);
+                const res = await fetch(`/driver/stop-student-count?driver_id=${3}&shift=${shift}`);
                 const data = await res.json();
                 
                 if (data.success) {
@@ -471,8 +483,8 @@
         function updateNextStopStudentCount() {
             if (nextStopData && stopsWithStudents.length > 0) {
                 const stopData = stopsWithStudents.find(s => 
-                    Math.abs(s.latitude - nextStopData.next_stop_lat) < 0.0001 && 
-                    Math.abs(s.longitude - nextStopData.next_stop_lng) < 0.0001
+                    Math.abs(s.latitude - nextStopData.lat) < 0.0001 && 
+                    Math.abs(s.longitude - nextStopData.lng) < 0.0001
                 );
                 
                 if (stopData) {
@@ -497,98 +509,89 @@
             }
         }
 
-        // Get Next Stop and ETA/Distance from Backend
+        // Get Next Stop
         async function fetchNextStop() {
             try {
-                // Call the updated backend API which calculates distance and ETA via OSRM
                 const res = await fetch(`/driver/eta/${driver_id}`);
                 const data = await res.json();
 
-                if (data.success && data.next_stop) {
-                    nextStopData = data; // Store all calculated data from backend
-                    
-                    // Update Info Box
+                if (data.success) {
+                    nextStopData = {
+                        name: data.next_stop,
+                        lat: data.next_stop_lat,
+                        lng: data.next_stop_lng,
+                        order: data.stop_order
+                    };
                     document.getElementById("nextStop").innerText = data.next_stop;
-                    document.getElementById("distance").innerText = data.distance_km; // Use backend distance
-                    document.getElementById("eta").innerText = data.eta_minutes;     // Use backend ETA
-                    
                     updateNextStopStudentCount();
-                    drawRoutePolyline(data.route_polyline); // Draw the polyline if provided by backend
                 }
             } catch (err) {
-                console.error("Fetch next stop/ETA error:", err);
-                document.getElementById("nextStop").innerText = 'Error loading ETA';
-                document.getElementById("distance").innerText = '--';
-                document.getElementById("eta").innerText = '--';
+                console.error("Fetch next stop error:", err);
             }
         }
 
         // Initialize Map
         async function initMap() {
             try {
-                // Assuming route_id is available, fetch route stops for initial map centering
-                const res = await fetch(`/admin/routes/${route_id}/stops`); 
+                const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
                 
                 if (data.success && data.stops) {
                     stops = data.stops;
                 } else {
-                    // Fallback coordinates if API fails
                     stops = [
-                        {latitude: 16.653962064256312, longitude: 74.26160009708647},
-                        {latitude: 16.688999437954738, longitude: 74.24858713549246}
+                        {latitude: 16.57865479, longitude: 74.29502221},
+                        {latitude: 16.58377964, longitude: 74.30980429},
+                        {latitude: 16.62039870, longitude: 74.29770568},
+                        {latitude: 16.63783643, longitude: 74.27932786},
+                        {latitude: 16.65451617, longitude: 74.26181243}
                     ];
                 }
             } catch (err) {
-                console.error("Error fetching stops for map init:", err);
-                // Fallback coordinates
+                console.error("Error fetching stops:", err);
                 stops = [
-                    {latitude: 16.653962064256312, longitude: 74.26160009708647},
-                    {latitude: 16.688999437954738, longitude: 74.24858713549246}
+                    {latitude: 16.57865479, longitude: 74.29502221},
+                    {latitude: 16.58377964, longitude: 74.30980429},
+                    {latitude: 16.62039870, longitude: 74.29770568},
+                    {latitude: 16.63783643, longitude: 74.27932786},
+                    {latitude: 16.65451617, longitude: 74.26181243}
                 ];
             }
 
-            const firstStop = stops[0] || {latitude: 16.65, longitude: 74.26}; // Ensure fallback is safe
+            const firstStop = stops[0];
             map = L.map('map').setView([firstStop.latitude, firstStop.longitude], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // Fetch the first ETA/stop data immediately after init
-            await fetchNextStop(); 
-            // Draw the route after fetching the polyline in fetchNextStop
+            await drawRoute();
         }
 
-        // --- NEW: Function to draw the polyline using mapbox-polyline library ---
-        function drawRoutePolyline(encodedPolyline) {
-            if (!encodedPolyline) return;
-
+        async function drawRoute() {
             try {
-                // Decode the polyline string into an array of [lat, lng] coordinates
-                const decodedCoords = polyline.decode(encodedPolyline).map(coord => [coord[0], coord[1]]); 
+                const coords = stops.map(s => [s.longitude, s.latitude]);
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": apiKey,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ coordinates: coords })
+                });
+
+                const data = await res.json();
+                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
                 
                 if (routeLine) {
                     map.removeLayer(routeLine);
                 }
-                
-                // Polyline needs [lat, lng] pairs
-                routeLine = L.polyline(decodedCoords, { color: "#667eea", weight: 5 }).addTo(map);
-
-                // Fit map view to the new route
-                if (routeLine) {
-                     map.fitBounds(routeLine.getBounds());
-                }
-
-            } catch (error) {
-                console.error("Error decoding or drawing polyline:", error);
-                // Fallback: Just connect the stops with a straight line if decoding fails
-                const stopCoords = stops.map(s => [s.latitude, s.longitude]);
-                routeLine = L.polyline(stopCoords, { color: "#ffa502", weight: 3, dashArray: '5, 10' }).addTo(map);
+                routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+            } catch (err) {
+                console.error("Route drawing error:", err);
             }
         }
-        // --- END NEW FUNCTION ---
-        
+
         // Bus marker icon
         const currentLocationIcon = L.divIcon({
             className: '',
@@ -612,7 +615,6 @@
 
         async function updateCompletedCount() {
             try {
-                // Assuming this endpoint is correct
                 const res = await fetch(`/driver/completed-stops/${driver_id}`);
                 const data = await res.json();
                 if (data.success) {
@@ -654,8 +656,14 @@
 
             let currentSpeed = speed ? speed * 3.6 : 0;
             
-            // --- REMOVED: Inaccurate speed calculation based on local Haversine ---
-            
+            if (!speed && lastPosition) {
+                const distance = calculateDistance(
+                    lastPosition.latitude, lastPosition.longitude,
+                    latitude, longitude
+                );
+                currentSpeed = (distance / timeSinceLastUpdate) * 3600;
+            }
+
             lastPosition = { latitude, longitude };
             const position_coords = [latitude, longitude];
 
@@ -681,16 +689,22 @@
                 map.panTo(position_coords, { animate: true, duration: 0.5 });
             }
 
-            // --- Updated ETA Display (Relies on fetchNextStop) ---
-            if (nextStopData) {
-                document.getElementById("distance").innerText = nextStopData.distance_km || '--';
-                document.getElementById("eta").innerText = nextStopData.eta_minutes || '--';
+            // Calculate ETA
+            if (nextStopData && nextStopData.lat && nextStopData.lng) {
+                const distance = calculateDistance(
+                    latitude, longitude,
+                    nextStopData.lat, nextStopData.lng
+                );
+                const eta = estimateETA(distance, currentSpeed);
+                
+                document.getElementById("distance").innerText = distance.toFixed(2);
+                document.getElementById("eta").innerText = eta;
                 document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
                 document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
 
                 updateDebugInfo({
                     latitude, longitude, accuracy, speed, altitude, heading,
-                    nextStop: { name: nextStopData.next_stop, distance: parseFloat(nextStopData.distance_km) }
+                    nextStop: { name: nextStopData.name, lat: nextStopData.lat, lng: nextStopData.lng, distance }
                 });
             }
 
@@ -706,7 +720,7 @@
                     if (data.completed_stops && data.completed_stops.length > 0) {
                         console.log("✅ Completed:", data.completed_stops);
                         updateCompletedCount();
-                        fetchNextStop(); // Refetch ETA/Next Stop after completion
+                        fetchNextStop();
                         fetchStopsWithStudents();
                     }
                 })
