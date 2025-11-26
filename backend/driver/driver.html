@@ -5,6 +5,7 @@
     <title>Driver Live Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
+        /* ADD YOUR EXISTING CSS HERE */
         * {
             margin: 0;
             padding: 0;
@@ -215,8 +216,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         .updating {
@@ -244,8 +252,13 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         .modal-content {
@@ -319,7 +332,7 @@
     <div id="infoBox">
         <b>Next Stop:</b> <span id="nextStop">Loading...</span><br>
         <b>Students Coming:</b> <span id="studentCount" style="color: #2ed573;">--</span> 👨‍🎓<br>
-        <b>ETA:</b> <span id="eta">--</span> mins<br>
+        <b>ETA:</b> <span id="eta">--</span> mins<span class="distance-badge" id="distanceBadge">ROAD</span><br>
         <b>Distance:</b> <span id="distance">--</span> km<br>
         <b>Speed:</b> <span id="speed">--</span> km/h<br>
         <b>Completed:</b> <span id="completedCount">0</span> stops<br>
@@ -372,7 +385,6 @@
     <script>
         const driver_id = 3;
         const route_id = 4;
-        // const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
         const shift = 'Morning';
 
         let stops = [];
@@ -387,20 +399,87 @@
         let debugMode = false;
         let busMarker = null;
         let accuracyCircle = null;
-        
+
+        // 🆕 OSRM Road Distance Variables
+        let lastRoadDistanceCall = 0;
+        let cachedRoadDistance = null;
+        let isCalculatingRoadDistance = false;
 
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
 
-        // Haversine formula
+        // Haversine formula (FALLBACK ONLY)
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
+        }
+
+        // 🆕 OSRM Road Distance Calculation
+        async function calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon) {
+            try {
+                const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    return {
+                        distance: data.routes[0].distance / 1000, // meters to km
+                        duration: data.routes[0].duration / 60,    // seconds to minutes
+                        success: true,
+                        method: 'road'
+                    };
+                }
+                console.warn('OSRM returned no routes');
+                return null;
+            } catch (err) {
+                console.error("OSRM error:", err);
+                return null;
+            }
+        }
+
+        // 🆕 Throttled Road Distance (prevents excessive API calls)
+        async function getThrottledRoadDistance(fromLat, fromLon, toLat, toLon) {
+            const now = Date.now();
+
+            // Cache for 5 seconds
+            if (now - lastRoadDistanceCall < 5000 && cachedRoadDistance) {
+                return cachedRoadDistance;
+            }
+
+            if (isCalculatingRoadDistance) {
+                return cachedRoadDistance || {
+                    distance: calculateDistance(fromLat, fromLon, toLat, toLon),
+                    duration: null,
+                    success: false,
+                    method: 'straight'
+                };
+            }
+
+            isCalculatingRoadDistance = true;
+
+            // Try OSRM
+            let result = await calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon);
+
+            // Fallback to straight-line
+            if (!result) {
+                console.warn('⚠️ OSRM failed, using straight-line distance');
+                result = {
+                    distance: calculateDistance(fromLat, fromLon, toLat, toLon),
+                    duration: null,
+                    success: false,
+                    method: 'straight'
+                };
+            }
+
+            lastRoadDistanceCall = now;
+            cachedRoadDistance = result;
+            isCalculatingRoadDistance = false;
+            return result;
         }
 
         // Estimate ETA
@@ -415,9 +494,9 @@
         async function fetchStopsWithStudents() {
             try {
                 console.log('🔃 Fetching student counts...');
-                const res = await fetch(`/driver/stop-student-count?driver_id=${3}&shift=${shift}`);
+                const res = await fetch(`/driver/stop-student-count?driver_id=${driver_id}&shift=${shift}`);
                 const data = await res.json();
-                
+
                 if (data.success) {
                     stopsWithStudents = data.data;
                     console.log('✅ Student counts loaded');
@@ -431,17 +510,15 @@
 
         // Update map markers with student counts
         function updateMapMarkers() {
-            // Remove old stop markers only
             stopMarkers.forEach(marker => map.removeLayer(marker));
             stopMarkers = [];
 
-            // Add new markers with counts
             stopsWithStudents.forEach((stop) => {
-                const color = stop.is_completed ? '#95a5a6' : 
-                             stop.coming_today === 0 ? '#ff4757' : '#2ed573';
-                
+                const color = stop.is_completed ? '#95a5a6' :
+                    stop.coming_today === 0 ? '#ff4757' : '#2ed573';
+
                 const displayText = stop.is_completed ? '✓' : stop.coming_today;
-                
+
                 const icon = L.divIcon({
                     className: '',
                     html: `<div style="
@@ -474,7 +551,7 @@
                             ${stop.is_completed ? '<b style="color:#95a5a6;">✅ DONE</b>' : ''}
                         </div>
                     `);
-                
+
                 stopMarkers.push(marker);
             });
         }
@@ -482,19 +559,19 @@
         // Update student count for next stop
         function updateNextStopStudentCount() {
             if (nextStopData && stopsWithStudents.length > 0) {
-                const stopData = stopsWithStudents.find(s => 
-                    Math.abs(s.latitude - nextStopData.lat) < 0.0001 && 
+                const stopData = stopsWithStudents.find(s =>
+                    Math.abs(s.latitude - nextStopData.lat) < 0.0001 &&
                     Math.abs(s.longitude - nextStopData.lng) < 0.0001
                 );
-                
+
                 if (stopData) {
                     const countEl = document.getElementById("studentCount");
                     countEl.innerText = stopData.coming_today;
-                    
+
                     if (stopData.coming_today === 0) {
                         countEl.style.color = '#ff4757';
                         countEl.style.fontSize = '32px';
-                        document.getElementById("skipWarning").innerHTML = 
+                        document.getElementById("skipWarning").innerHTML =
                             '<div class="skip-warning">⚠️ No students - Consider skipping</div>';
                     } else if (stopData.coming_today < 3) {
                         countEl.style.color = '#ffa502';
@@ -535,32 +612,32 @@
             try {
                 const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
-                
+
                 if (data.success && data.stops) {
                     stops = data.stops;
                 } else {
                     stops = [
-                        {latitude: 16.57865479, longitude: 74.29502221},
-                        {latitude: 16.58377964, longitude: 74.30980429},
-                        {latitude: 16.62039870, longitude: 74.29770568},
-                        {latitude: 16.63783643, longitude: 74.27932786},
-                        {latitude: 16.65451617, longitude: 74.26181243}
+                        { latitude: 16.57865479, longitude: 74.29502221 },
+                        { latitude: 16.58377964, longitude: 74.30980429 },
+                        { latitude: 16.62039870, longitude: 74.29770568 },
+                        { latitude: 16.63783643, longitude: 74.27932786 },
+                        { latitude: 16.65451617, longitude: 74.26181243 }
                     ];
                 }
             } catch (err) {
                 console.error("Error fetching stops:", err);
                 stops = [
-                    {latitude: 16.57865479, longitude: 74.29502221},
-                    {latitude: 16.58377964, longitude: 74.30980429},
-                    {latitude: 16.62039870, longitude: 74.29770568},
-                    {latitude: 16.63783643, longitude: 74.27932786},
-                    {latitude: 16.65451617, longitude: 74.26181243}
+                    { latitude: 16.57865479, longitude: 74.29502221 },
+                    { latitude: 16.58377964, longitude: 74.30980429 },
+                    { latitude: 16.62039870, longitude: 74.29770568 },
+                    { latitude: 16.63783643, longitude: 74.27932786 },
+                    { latitude: 16.65451617, longitude: 74.26181243 }
                 ];
             }
 
             const firstStop = stops[0];
             map = L.map('map').setView([firstStop.latitude, firstStop.longitude], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
             }).addTo(map);
@@ -582,7 +659,7 @@
 
                 const data = await res.json();
                 const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                
+
                 if (routeLine) {
                     map.removeLayer(routeLine);
                 }
@@ -632,7 +709,9 @@
                     Accuracy: ±${info.accuracy.toFixed(1)}m<br>
                     Speed: ${info.speed ? (info.speed * 3.6).toFixed(1) : '0'} km/h<br>
                     Shift: ${shift}<br>
-                    ${info.nextStop ? `Next: ${info.nextStop.name} (${info.nextStop.distance.toFixed(2)}km)` : ''}
+                    ${info.nextStop ? `Next: ${info.nextStop.name}<br>
+                    Distance: ${info.nextStop.distance.toFixed(2)}km (${info.nextStop.method})<br>
+                    ${info.nextStop.duration ? `Duration: ${info.nextStop.duration.toFixed(1)} min` : ''}` : ''}
                 `;
             }
         }
@@ -642,8 +721,8 @@
             document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
         }
 
-        // Handle Location Update
-        function handleLocationUpdate(position) {
+        // 🆕 Handle Location Update with OSRM Road Distance
+        async function handleLocationUpdate(position) {
             const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
             const now = Date.now();
             const timeSinceLastUpdate = (now - lastUpdateTime) / 1000;
@@ -655,7 +734,7 @@
             document.getElementById("gpsInfo").innerText = `GPS: ±${accuracy.toFixed(0)}m | ${new Date().toLocaleTimeString()}`;
 
             let currentSpeed = speed ? speed * 3.6 : 0;
-            
+
             if (!speed && lastPosition) {
                 const distance = calculateDistance(
                     lastPosition.latitude, lastPosition.longitude,
@@ -689,23 +768,52 @@
                 map.panTo(position_coords, { animate: true, duration: 0.5 });
             }
 
-            // Calculate ETA
+            // 🆕 Calculate Road Distance using OSRM
             if (nextStopData && nextStopData.lat && nextStopData.lng) {
-                const distance = calculateDistance(
+                const roadData = await getThrottledRoadDistance(
                     latitude, longitude,
                     nextStopData.lat, nextStopData.lng
                 );
-                const eta = estimateETA(distance, currentSpeed);
-                
-                document.getElementById("distance").innerText = distance.toFixed(2);
-                document.getElementById("eta").innerText = eta;
-                document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
-                document.getElementById("updateStatus").innerText = `Updated ${new Date().toLocaleTimeString()}`;
 
-                updateDebugInfo({
-                    latitude, longitude, accuracy, speed, altitude, heading,
-                    nextStop: { name: nextStopData.name, lat: nextStopData.lat, lng: nextStopData.lng, distance }
-                });
+                if (roadData) {
+                    // Update distance
+                    document.getElementById("distance").innerText = roadData.distance.toFixed(2);
+
+                    // Update badge
+                    const badge = document.getElementById("distanceBadge");
+                    if (roadData.method === 'road') {
+                        badge.innerText = 'ROAD';
+                        badge.style.background = '#2ed573';
+                    } else {
+                        badge.innerText = 'DIRECT';
+                        badge.style.background = '#ff4757';
+                    }
+
+                    // Calculate ETA
+                    let eta;
+                    if (roadData.duration && roadData.method === 'road') {
+                        eta = Math.ceil(roadData.duration);
+                    } else {
+                        eta = estimateETA(roadData.distance, currentSpeed);
+                    }
+
+                    document.getElementById("eta").innerText = eta;
+                    document.getElementById("speed").innerText = currentSpeed > 1 ? currentSpeed.toFixed(1) : "0";
+                    document.getElementById("updateStatus").innerText =
+                        `Updated ${new Date().toLocaleTimeString()} (${roadData.method === 'road' ? 'Road' : 'Direct'})`;
+
+                    updateDebugInfo({
+                        latitude, longitude, accuracy, speed, altitude, heading,
+                        nextStop: {
+                            name: nextStopData.name,
+                            lat: nextStopData.lat,
+                            lng: nextStopData.lng,
+                            distance: roadData.distance,
+                            duration: roadData.duration,
+                            method: roadData.method
+                        }
+                    });
+                }
             }
 
             // Send to server
@@ -715,16 +823,18 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ driver_id, latitude, longitude })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.completed_stops && data.completed_stops.length > 0) {
-                        console.log("✅ Completed:", data.completed_stops);
-                        updateCompletedCount();
-                        fetchNextStop();
-                        fetchStopsWithStudents();
-                    }
-                })
-                .catch(err => console.error("Location update error:", err));
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.completed_stops && data.completed_stops.length > 0) {
+                            console.log("✅ Completed:", data.completed_stops);
+                            updateCompletedCount();
+                            fetchNextStop();
+                            fetchStopsWithStudents();
+                            // Clear cache when stop completed
+                            cachedRoadDistance = null;
+                        }
+                    })
+                    .catch(err => console.error("Location update error:", err));
             }
         }
 
@@ -778,6 +888,7 @@
                 updateCompletedCount();
                 fetchNextStop();
                 fetchStopsWithStudents();
+                cachedRoadDistance = null;
             } catch (err) {
                 alert("Error resetting");
             }
@@ -787,11 +898,11 @@
             try {
                 const res = await fetch(`/driver/completed-stops/${driver_id}`);
                 const data = await res.json();
-                
+
                 if (data.completed_stops.length === 0) {
                     alert("No stops completed!");
                 } else {
-                    const list = data.completed_stops.map(s => 
+                    const list = data.completed_stops.map(s =>
                         `${s.stop_order}. ${s.name} - ${new Date(s.completed_at).toLocaleTimeString()}`
                     ).join('\n');
                     alert(`Completed:\n\n${list}`);
@@ -830,7 +941,7 @@
             }
         }
 
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             if (event.target == document.getElementById('logoutModal')) {
                 closeLogoutModal();
             }
