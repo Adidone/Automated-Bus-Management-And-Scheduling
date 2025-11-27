@@ -338,8 +338,7 @@
         <div class="modal-content">
             <h3>📝 Confirm Attendance</h3>
             <p id="attendanceMessage"></p>
-            <input type="text" id="reasonInput" placeholder="Reason (optional)"
-                style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+            <input type="text" id="reasonInput" placeholder="Reason (optional)" style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="closeAttendanceModal()">Cancel</button>
                 <button class="modal-btn confirm" onclick="confirmAttendance()">Confirm</button>
@@ -455,8 +454,11 @@
         // Fetch student info and route
         async function fetchStudentInfo() {
             try {
+                console.log('🔍 Fetching student info for student_id:', student_id);
                 const res = await fetch(`/student/info/${student_id}`);
                 const data = await res.json();
+
+                console.log('📦 Student API response:', data);
 
                 if (data.success) {
                     studentStopData = {
@@ -468,34 +470,44 @@
                     route_id = data.student.route_id;
                     document.getElementById("yourStop").innerText = studentStopData.name;
 
+                    console.log('✅ Student stop data:', studentStopData);
+
                     // Get driver info
+                    console.log('🔍 Fetching driver info...');
                     const driverRes = await fetch(`/student/driver-info/${student_id}`);
                     const driverData = await driverRes.json();
+                    console.log('📦 Driver API response:', driverData);
+
                     if (driverData.success) {
                         driver_id = driverData.driver_id;
+                        console.log('✅ Driver ID:', driver_id);
                     }
-
-                    console.log('✅ Student info loaded:', studentStopData);
+                } else {
+                    console.error('❌ Student info API failed:', data);
                 }
             } catch (err) {
-                console.error("Error fetching student info:", err);
+                console.error("❌ Error fetching student info:", err);
             }
         }
 
         // Initialize Map and Draw Route (exactly like driver)
         async function initMap() {
             try {
+                console.log('🔍 Fetching route stops for route_id:', route_id);
                 const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
 
-                if (data.success && data.stops) {
+                console.log('📦 Route API response:', data);
+
+                if (data.success && data.stops && data.stops.length > 0) {
                     stops = data.stops;
-                    console.log('✅ Route stops loaded:', stops.length);
+                    console.log('✅ Route stops loaded:', stops.length, stops);
                 } else {
+                    console.warn('⚠️ No stops found in API response');
                     stops = [];
                 }
             } catch (err) {
-                console.error("Error fetching stops:", err);
+                console.error("❌ Error fetching stops:", err);
                 stops = [];
             }
 
@@ -539,10 +551,16 @@
 
         // Draw route (exactly like driver)
         async function drawRoute() {
-            if (stops.length === 0) return;
+            if (stops.length === 0) {
+                console.warn('⚠️ No stops available to draw route');
+                return;
+            }
 
             try {
+                console.log('🎨 Drawing route with', stops.length, 'stops');
                 const coords = stops.map(s => [s.longitude, s.latitude]);
+                console.log('📍 Coordinates:', coords);
+
                 const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
                     method: "POST",
                     headers: {
@@ -553,15 +571,21 @@
                 });
 
                 const data = await res.json();
-                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                console.log('🗺️ OpenRouteService response:', data);
 
-                if (routeLine) {
-                    map.removeLayer(routeLine);
+                if (data.features && data.features.length > 0) {
+                    const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+                    if (routeLine) {
+                        map.removeLayer(routeLine);
+                    }
+                    routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+                    console.log('✅ Route drawn successfully');
+                } else {
+                    console.error('❌ No route features in response');
                 }
-                routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
-                console.log('✅ Route drawn');
             } catch (err) {
-                console.error("Route drawing error:", err);
+                console.error("❌ Route drawing error:", err);
             }
         }
 
