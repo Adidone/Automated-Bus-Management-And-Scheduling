@@ -5,7 +5,6 @@
     <title>Student Bus Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        /* ADD YOUR EXISTING CSS HERE */
         * {
             margin: 0;
             padding: 0;
@@ -114,15 +113,10 @@
         }
 
         @keyframes blink {
-
-            0%,
-            50%,
-            100% {
+            0%, 50%, 100% {
                 opacity: 1;
             }
-
-            25%,
-            75% {
+            25%, 75% {
                 opacity: 0.5;
             }
         }
@@ -163,12 +157,9 @@
         }
 
         @keyframes pulse {
-
-            0%,
-            100% {
+            0%, 100% {
                 opacity: 1;
             }
-
             50% {
                 opacity: 0.5;
             }
@@ -210,7 +201,6 @@
             from {
                 transform: translateX(400px);
             }
-
             to {
                 transform: translateX(0);
             }
@@ -287,6 +277,16 @@
         .modal-btn.cancel:hover {
             background: #ccc;
         }
+
+        .distance-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            margin-left: 5px;
+        }
     </style>
 </head>
 
@@ -347,7 +347,7 @@
 
     <script>
         // CHANGE THIS TO YOUR STUDENT ID
-        const student_id = 13; // Replace with actual student ID
+        const student_id = 1;
         const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
 
         let map = null;
@@ -358,14 +358,20 @@
         let lastBusUpdate = null;
         let attendanceToday = null;
         let notificationShown = false;
+        let driver_id = null;
+        let route_id = null;
+        let stops = [];
+        let stopMarkers = [];
+        let accuracyCircle = null;
 
-        // 🆕 OSRM Road Distance Variables
+        // OSRM Road Distance Variables
         let lastRoadDistanceCall = 0;
         let cachedRoadDistance = null;
         let isCalculatingRoadDistance = false;
-        let lastBusLocation = null;
 
-        // Haversine formula (FALLBACK ONLY)
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+
+        // Haversine formula (FALLBACK)
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -377,7 +383,7 @@
             return R * c;
         }
 
-        // 🆕 OSRM Road Distance Calculation
+        // OSRM Road Distance Calculation
         async function calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon) {
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
@@ -386,8 +392,8 @@
 
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                     return {
-                        distance: data.routes[0].distance / 1000, // meters to km
-                        duration: data.routes[0].duration / 60,    // seconds to minutes
+                        distance: data.routes[0].distance / 1000,
+                        duration: data.routes[0].duration / 60,
                         success: true,
                         method: 'road'
                     };
@@ -400,11 +406,10 @@
             }
         }
 
-        // 🆕 Throttled Road Distance (prevents excessive API calls)
+        // Throttled Road Distance
         async function getThrottledRoadDistance(fromLat, fromLon, toLat, toLon) {
             const now = Date.now();
 
-            // Cache for 10 seconds (students don't need updates as frequently)
             if (now - lastRoadDistanceCall < 10000 && cachedRoadDistance) {
                 return cachedRoadDistance;
             }
@@ -420,10 +425,8 @@
 
             isCalculatingRoadDistance = true;
 
-            // Try OSRM
             let result = await calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon);
 
-            // Fallback to straight-line
             if (!result) {
                 console.warn('⚠️ OSRM failed, using straight-line distance');
                 result = {
@@ -448,7 +451,7 @@
             return Math.max(1, Math.round((distanceKm / 30) * 60));
         }
 
-        // Fetch student info
+        // Fetch student info and trip details
         async function fetchStudentInfo() {
             try {
                 const res = await fetch(`/student/info/${student_id}`);
@@ -456,128 +459,220 @@
 
                 if (data.success) {
                     studentStop = data.student;
+                    driver_id = studentStop.driver_id;
+                    route_id = studentStop.route_id;
+
                     document.getElementById("yourStop").innerText = studentStop.stop_name;
 
-                    // Initialize map at student's stop
-                    if (!map) {
-                        initMap();
-                    }
+                    console.log(`Student assigned to Driver ${driver_id}, Route ${route_id}`);
 
+                    // Initialize map
+                    await initMap();
+                    
                     // Add student stop marker
-                    if (studentMarker) {
-                        map.removeLayer(studentMarker);
-                    }
-
-                    const studentIcon = L.divIcon({
-                        className: '',
-                        html: `<div style="
-                            width: 30px; height: 30px; 
-                            background: #2ed573; 
-                            border: 3px solid white; 
-                            border-radius: 50%;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 18px;
-                        ">🎓</div>`,
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15]
-                    });
-
-                    studentMarker = L.marker([studentStop.stop_lat, studentStop.stop_lng], { icon: studentIcon })
-                        .addTo(map)
-                        .bindPopup(`<b>Your Stop: ${studentStop.stop_name}</b>`)
-                        .openPopup();
+                    addStudentMarker();
+                } else {
+                    alert("Error: " + data.message);
                 }
             } catch (err) {
                 console.error("Error fetching student info:", err);
+                alert("Failed to load student information");
             }
         }
 
-        // 🆕 Fetch driver location with OSRM Road Distance
+        // Initialize Map with Route
+        async function initMap() {
+            try {
+                const res = await fetch(`/admin/routes/${route_id}/stops`);
+                const data = await res.json();
+
+                if (data.success && data.stops) {
+                    stops = data.stops;
+                } else {
+                    console.error("No stops found for route");
+                    stops = [];
+                }
+            } catch (err) {
+                console.error("Error fetching stops:", err);
+            }
+
+            // Create map centered on student's stop
+            map = L.map('map').setView([studentStop.stop_lat, studentStop.stop_lng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            // Draw route if stops available
+            if (stops.length > 0) {
+                await drawRoute();
+                addAllStopMarkers();
+            }
+        }
+
+        // Draw route line
+        async function drawRoute() {
+            try {
+                const coords = stops.map(s => [s.longitude, s.latitude]);
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": apiKey,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ coordinates: coords })
+                });
+
+                const data = await res.json();
+                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                }
+                routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5, opacity: 0.7 }).addTo(map);
+            } catch (err) {
+                console.error("Route drawing error:", err);
+            }
+        }
+
+        // Add all stop markers (gray)
+        function addAllStopMarkers() {
+            stops.forEach((stop, index) => {
+                const isMyStop = Math.abs(stop.latitude - studentStop.stop_lat) < 0.0001 &&
+                                 Math.abs(stop.longitude - studentStop.stop_lng) < 0.0001;
+
+                if (!isMyStop) {
+                    const icon = L.divIcon({
+                        className: '',
+                        html: `<div style="
+                            width: 25px; height: 25px; 
+                            background: #95a5a6; 
+                            border: 2px solid white; 
+                            border-radius: 50%;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 11px;
+                            color: white;
+                            font-weight: bold;
+                        ">${index + 1}</div>`,
+                        iconSize: [25, 25],
+                        iconAnchor: [12, 12]
+                    });
+
+                    const marker = L.marker([stop.latitude, stop.longitude], { icon })
+                        .addTo(map)
+                        .bindPopup(`<b>Stop ${index + 1}</b><br>${stop.stop_name || 'Bus Stop'}`);
+
+                    stopMarkers.push(marker);
+                }
+            });
+        }
+
+        // Add student stop marker (highlighted)
+        function addStudentMarker() {
+            const studentIcon = L.divIcon({
+                className: '',
+                html: `<div style="
+                    width: 40px; height: 40px; 
+                    background: #2ed573; 
+                    border: 4px solid white; 
+                    border-radius: 50%;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 24px;
+                    animation: pulse-green 2s infinite;
+                ">🎓</div>
+                <style>
+                    @keyframes pulse-green {
+                        0%, 100% { transform: scale(1); }
+                        50% { transform: scale(1.15); }
+                    }
+                </style>`,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            });
+
+            studentMarker = L.marker([studentStop.stop_lat, studentStop.stop_lng], { icon: studentIcon })
+                .addTo(map)
+                .bindPopup(`<b>📍 Your Stop</b><br>${studentStop.stop_name}`)
+                .openPopup();
+        }
+
+        // Fetch driver location
         async function fetchDriverLocation() {
             try {
-                // Get driver ID from student's route
-                const driverRes = await fetch(`/student/driver-info/${student_id}`);
-                const driverData = await driverRes.json();
-
-                if (!driverData.success || !driverData.driver_id) {
+                if (!driver_id) {
                     document.getElementById("busLocation").innerText = "No driver assigned";
                     return;
                 }
 
-                const driver_id = driverData.driver_id;
-
-                // Get driver's live location
                 const locationRes = await fetch(`/driver/location/${driver_id}`);
                 const locationData = await locationRes.json();
 
                 if (locationData.success) {
                     const busLocation = locationData.location;
                     lastBusUpdate = new Date();
-                    lastBusLocation = busLocation;
 
-                    // Update status
                     document.getElementById("statusDot").className = "status-dot active";
                     document.getElementById("busLocation").innerText = "On Route";
                     document.getElementById("lastUpdate").innerText = lastBusUpdate.toLocaleTimeString();
 
-                    // 🆕 Calculate Road Distance and ETA using OSRM
-                    if (studentStop) {
-                        const roadData = await getThrottledRoadDistance(
-                            busLocation.latitude, busLocation.longitude,
-                            studentStop.stop_lat, studentStop.stop_lng
-                        );
+                    // Calculate Road Distance using OSRM
+                    const roadData = await getThrottledRoadDistance(
+                        busLocation.latitude, busLocation.longitude,
+                        studentStop.stop_lat, studentStop.stop_lng
+                    );
 
-                        if (roadData) {
-                            const distance = roadData.distance;
-                            let eta;
+                    if (roadData) {
+                        const distance = roadData.distance;
+                        let eta;
 
-                            // Use actual OSRM duration if available
-                            if (roadData.duration && roadData.method === 'road') {
-                                eta = Math.ceil(roadData.duration);
-                            } else {
-                                eta = calculateETA(distance, 30);
-                            }
-
-                            // Update display
-                            const distanceEl = document.getElementById("distance");
-                            const etaEl = document.getElementById("eta");
-
-                            distanceEl.innerText = distance.toFixed(1);
-                            etaEl.innerText = eta;
-
-                            // Update badge
-                            const badge = document.getElementById("distanceBadge");
-                            if (roadData.method === 'road') {
-                                badge.innerText = 'ROAD';
-                                badge.style.background = '#2ed573';
-                            } else {
-                                badge.innerText = 'DIRECT';
-                                badge.style.background = '#ff4757';
-                            }
-
-                            // Color coding based on distance
-                            if (distance < 1) {
-                                distanceEl.className = "big-number status-urgent";
-                                etaEl.className = "big-number status-urgent";
-                                showNotification("🚌 Bus is very close! Be ready!");
-                            } else if (distance < 3) {
-                                distanceEl.className = "big-number status-warning";
-                                etaEl.className = "big-number status-warning";
-                            } else {
-                                distanceEl.className = "big-number status-good";
-                                etaEl.className = "big-number status-good";
-                            }
-
-                            document.getElementById("speed").innerText = "30"; // You can get actual speed from backend
-
-                            console.log(`📍 Distance to stop: ${distance.toFixed(2)}km (${roadData.method}), ETA: ${eta} min`);
+                        if (roadData.duration && roadData.method === 'road') {
+                            eta = Math.ceil(roadData.duration);
+                        } else {
+                            eta = calculateETA(distance, 30);
                         }
+
+                        // Update display
+                        const distanceEl = document.getElementById("distance");
+                        const etaEl = document.getElementById("eta");
+
+                        distanceEl.innerText = distance.toFixed(1);
+                        etaEl.innerText = eta;
+
+                        // Update badge
+                        const badge = document.getElementById("distanceBadge");
+                        if (roadData.method === 'road') {
+                            badge.innerText = 'ROAD';
+                            badge.style.background = '#2ed573';
+                        } else {
+                            badge.innerText = 'DIRECT';
+                            badge.style.background = '#ff4757';
+                        }
+
+                        // Color coding
+                        if (distance < 1) {
+                            distanceEl.className = "big-number status-urgent";
+                            etaEl.className = "big-number status-urgent";
+                            showNotification("🚌 Bus is very close! Be ready!");
+                        } else if (distance < 3) {
+                            distanceEl.className = "big-number status-warning";
+                            etaEl.className = "big-number status-warning";
+                        } else {
+                            distanceEl.className = "big-number status-good";
+                            etaEl.className = "big-number status-good";
+                        }
+
+                        document.getElementById("speed").innerText = "30";
+
+                        console.log(`📍 Distance to your stop: ${distance.toFixed(2)}km (${roadData.method}), ETA: ${eta} min`);
                     }
 
-                    // Update bus marker on map
+                    // Update bus marker
                     const busIcon = L.divIcon({
                         className: '',
                         html: `<div style="
@@ -610,18 +705,17 @@
                             .bindPopup("🚌 Your Bus");
                     }
 
-                    // Draw line from bus to student stop
-                    if (routeLine) {
-                        map.removeLayer(routeLine);
+                    // Accuracy circle
+                    if (accuracyCircle) map.removeLayer(accuracyCircle);
+                    if (busLocation.accuracy) {
+                        accuracyCircle = L.circle([busLocation.latitude, busLocation.longitude], {
+                            radius: busLocation.accuracy,
+                            color: '#ff4757',
+                            fillColor: '#ff4757',
+                            fillOpacity: 0.1,
+                            weight: 1
+                        }).addTo(map);
                     }
-                    routeLine = L.polyline([
-                        [busLocation.latitude, busLocation.longitude],
-                        [studentStop.stop_lat, studentStop.stop_lng]
-                    ], {
-                        color: "#667eea",
-                        weight: 3,
-                        dashArray: "10, 10"
-                    }).addTo(map);
 
                     // Fit map to show both bus and student stop
                     const bounds = L.latLngBounds([
@@ -666,17 +760,6 @@
             }
         }
 
-        // Initialize map
-        function initMap() {
-            if (studentStop) {
-                map = L.map('map').setView([studentStop.stop_lat, studentStop.stop_lng], 14);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
-            }
-        }
-
         // Show notification
         function showNotification(message) {
             if (notificationShown) return;
@@ -688,7 +771,7 @@
 
             setTimeout(() => {
                 notification.style.display = "none";
-                setTimeout(() => { notificationShown = false; }, 300000); // Reset after 5 minutes
+                setTimeout(() => { notificationShown = false; }, 300000);
             }, 5000);
         }
 
@@ -749,7 +832,7 @@
 
         // Refresh tracking
         function refreshTracking() {
-            cachedRoadDistance = null; // Clear cache to force new calculation
+            cachedRoadDistance = null;
             fetchDriverLocation();
             checkAttendance();
             showNotification("🔄 Tracking refreshed!");
