@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Bus Tracking</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        /* ADD YOUR EXISTING CSS HERE */
         * {
             margin: 0;
             padding: 0;
@@ -291,89 +294,263 @@
 </head>
 
 <body>
-    <h2>🎓 Student Bus Tracking</h2>
+    <div class="container">
+        <header>
+            <h1>🚌 Track Your Bus</h1>
+            <button id="logout-btn">Logout</button>
+        </header>
 
-    <div id="controls">
-        <button id="attendanceBtn" onclick="markAttendance(true)">✅ I'm Coming</button>
-        <button id="notComingBtn" onclick="markAttendance(false)">❌ Not Coming</button>
-        <button id="refreshBtn" onclick="refreshTracking()">🔃 Refresh</button>
-    </div>
-
-    <div id="infoBox">
-        <b>Your Stop:</b> <span id="yourStop">Loading...</span><br>
-        <b>Bus ETA:</b> <span id="eta">--</span> mins<span class="distance-badge" id="distanceBadge">ROAD</span><br>
-        <b>Distance:</b> <span id="distance">--</span> km<br>
-        <b>Bus Speed:</b> <span id="speed">--</span> km/h<br>
-        <b>Bus Status:</b> <span id="busStatus">Searching...</span><br>
-        <span class="updating" id="updateStatus">Initializing...</span><br>
-        <span class="gps-info" id="gpsInfo">Last Update: --</span>
-        <div id="attendanceStatus"></div>
-    </div>
-
-    <div id="status">
-        <span class="status-dot active" id="statusDot"></span>
-        <span id="statusText">Tracking Active</span>
-    </div>
-
-    <div id="legend">
-        <h4>📍 Legend</h4>
-        <div class="legend-item">
-            <div class="legend-dot" style="background: #2ed573;">🎓</div>
-            <span>Your Stop</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-dot" style="background: #ff4757;">🚌</div>
-            <span>Bus</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-dot" style="background: #95a5a6;">✓</div>
-            <span>Completed</span>
-        </div>
-    </div>
-
-    <div id="map"></div>
-
-    <!-- Attendance Modal -->
-    <div id="attendanceModal" class="modal">
-        <div class="modal-content">
-            <h3>📝 Confirm Attendance</h3>
-            <p id="attendanceMessage"></p>
-            <input type="text" id="reasonInput" placeholder="Reason (optional)" style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
-            <div class="modal-buttons">
-                <button class="modal-btn cancel" onclick="closeAttendanceModal()">Cancel</button>
-                <button class="modal-btn confirm" onclick="confirmAttendance()">Confirm</button>
+        <div class="info-card">
+            <div class="student-info">
+                <h2 id="student-name">Loading...</h2>
+                <p id="student-details"></p>
+            </div>
+            <div class="route-info">
+                <h3>Route Information</h3>
+                <p id="route-name">Route: -</p>
+                <p id="driver-name">Driver: -</p>
+                <p id="bus-number">Bus: -</p>
             </div>
         </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="label">Connection:</span>
+                <span id="connection-status" class="value">Connecting...</span>
+            </div>
+            <div class="status-item">
+                <span class="label">Last Update:</span>
+                <span id="last-update" class="value">-</span>
+            </div>
+            <div class="status-item">
+                <span class="label">Distance:</span>
+                <span id="distance-info" class="value">-</span>
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="stops-section">
+            <h3>🚏 Route Stops</h3>
+            <div id="stops-list"></div>
+        </div>
+
+        <div class="eta-card">
+            <h3>Estimated Arrival</h3>
+            <p id="eta-info">Calculating...</p>
+        </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
     <script>
-        // CHANGE THIS TO YOUR STUDENT ID
-        const student_id = 13;
-        const shift = new Date().getHours() < 14 ? 'Morning' : 'Evening';
+        const API_BASE = window.location.origin;
+        let map, busMarker, studentMarker;
+        let socket;
+        let studentData = null;
+        let driverId = null;
+        let busIcon, studentIcon, stopIcon, completedStopIcon;
 
-        let stops = [];
-        let stopMarkers = [];
-        let routeLine = null;
-        let map = null;
-        let studentStopData = null;
-        let busMarker = null;
-        let studentMarker = null;
-        let lastUpdateTime = Date.now();
-        let driver_id = null;
-        let route_id = null;
+        // Initialize icons
+        function initIcons() {
+            busIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+                iconSize: [40, 40],
+                iconAnchor: [20, 40],
+                popupAnchor: [0, -40]
+            });
 
-        // 🆕 OSRM Road Distance Variables
-        let lastRoadDistanceCall = 0;
-        let cachedRoadDistance = null;
-        let isCalculatingRoadDistance = false;
+            studentIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                iconSize: [35, 35],
+                iconAnchor: [17, 35],
+                popupAnchor: [0, -35]
+            });
 
-        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+            stopIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
 
-        // Haversine formula (FALLBACK ONLY)
+            completedStopIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/5610/5610944.png',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+        }
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([19.0760, 72.8777], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            initIcons();
+        }
+
+        // Fetch student data
+        async function fetchStudentData() {
+            try {
+                const studentId = localStorage.getItem('student_id');
+                if (!studentId) {
+                    window.location.href = '/attendance.html';
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE}/student/profile/${studentId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    studentData = data.data;
+                    driverId = studentData.driver_id;
+                    updateStudentInfo();
+                    connectWebSocket();
+                    fetchRouteStops();
+
+                    // Add student location marker if available
+                    if (studentData.latitude && studentData.longitude) {
+                        studentMarker = L.marker([studentData.latitude, studentData.longitude], {
+                            icon: studentIcon
+                        }).addTo(map).bindPopup(`<b>Your Location</b><br>${studentData.stop_name}`);
+                        map.setView([studentData.latitude, studentData.longitude], 14);
+                    }
+                } else {
+                    alert('Failed to load student data');
+                }
+            } catch (err) {
+                console.error('Error fetching student data:', err);
+                alert('Error loading data');
+            }
+        }
+
+        // Update student info display
+        function updateStudentInfo() {
+            document.getElementById('student-name').textContent = studentData.student_name;
+            document.getElementById('student-details').textContent =
+                `Roll No: ${studentData.roll_no} | Stop: ${studentData.stop_name}`;
+            document.getElementById('route-name').textContent = `Route: ${studentData.route_name}`;
+            document.getElementById('driver-name').textContent = `Driver: ${studentData.driver_name}`;
+            document.getElementById('bus-number').textContent = `Bus: ${studentData.bus_number}`;
+        }
+
+        // Connect to WebSocket
+        function connectWebSocket() {
+            socket = io(API_BASE);
+
+            socket.on('connect', () => {
+                console.log('WebSocket connected:', socket.id);
+                document.getElementById('connection-status').textContent = 'Connected ✓';
+                document.getElementById('connection-status').style.color = '#10b981';
+
+                // Subscribe to driver updates
+                socket.emit('subscribe-driver', driverId);
+            });
+
+            socket.on('location-update', (data) => {
+                console.log('Location update received:', data);
+                updateBusLocation(data.latitude, data.longitude);
+                updateLastUpdateTime(data.updated_at);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('WebSocket disconnected');
+                document.getElementById('connection-status').textContent = 'Disconnected ✗';
+                document.getElementById('connection-status').style.color = '#ef4444';
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+                document.getElementById('connection-status').textContent = 'Error ✗';
+                document.getElementById('connection-status').style.color = '#ef4444';
+            });
+        }
+
+        // Update bus location on map
+        function updateBusLocation(lat, lng) {
+            if (busMarker) {
+                busMarker.setLatLng([lat, lng]);
+            } else {
+                busMarker = L.marker([lat, lng], { icon: busIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>Bus Location</b><br>Driver: ${studentData.driver_name}`);
+            }
+
+            // Calculate distance if student location exists
+            if (studentMarker) {
+                const distance = calculateDistance(
+                    studentData.latitude,
+                    studentData.longitude,
+                    lat,
+                    lng
+                );
+                document.getElementById('distance-info').textContent = `${distance.toFixed(2)} km away`;
+
+                // Calculate ETA (assuming 30 km/h average speed)
+                const eta = (distance / 30) * 60; // minutes
+                document.getElementById('eta-info').textContent =
+                    eta < 1 ? 'Arriving soon!' : `~${Math.round(eta)} minutes`;
+            }
+
+            // Auto-center map to show both markers
+            if (studentMarker) {
+                const bounds = L.latLngBounds([
+                    [lat, lng],
+                    [studentData.latitude, studentData.longitude]
+                ]);
+                map.fitBounds(bounds, { padding: [50, 50] });
+            } else {
+                map.setView([lat, lng], 15);
+            }
+        }
+
+        // Fetch and display route stops
+        async function fetchRouteStops() {
+            try {
+                const response = await fetch(`${API_BASE}/student/route-stops/${studentData.route_id}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayStops(data.data.stops, data.data.completed_stops);
+                }
+            } catch (err) {
+                console.error('Error fetching stops:', err);
+            }
+        }
+
+        // Display stops on map and list
+        function displayStops(stops, completedStops) {
+            const stopsList = document.getElementById('stops-list');
+            stopsList.innerHTML = '';
+
+            stops.forEach(stop => {
+                const isCompleted = completedStops.includes(stop.id);
+                const icon = isCompleted ? completedStopIcon : stopIcon;
+
+                // Add marker to map
+                L.marker([stop.latitude, stop.longitude], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <b>${stop.name}</b><br>
+                        Order: ${stop.stop_order}<br>
+                        Status: ${isCompleted ? '✓ Completed' : '⏳ Pending'}
+                    `);
+
+                // Add to list
+                const stopDiv = document.createElement('div');
+                stopDiv.className = `stop-item ${isCompleted ? 'completed' : ''}`;
+                stopDiv.innerHTML = `
+                    <span class="stop-number">${stop.stop_order}</span>
+                    <div class="stop-details">
+                        <strong>${stop.name}</strong>
+                        <small>${isCompleted ? '✓ Completed' : '⏳ Pending'}</small>
+                    </div>
+                `;
+                stopsList.appendChild(stopDiv);
+            });
+        }
+
+        // Calculate distance between two coordinates (Haversine formula)
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371;
+            const R = 6371; // Earth's radius in km
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -383,476 +560,33 @@
             return R * c;
         }
 
-        // 🆕 OSRM Road Distance Calculation
-        async function calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon) {
-            try {
-                const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
-                const res = await fetch(url);
-                const data = await res.json();
+        // Update last update time
+        function updateLastUpdateTime(timestamp) {
+            const time = new Date(timestamp);
+            const now = new Date();
+            const diff = Math.floor((now - time) / 1000); // seconds
 
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    return {
-                        distance: data.routes[0].distance / 1000,
-                        duration: data.routes[0].duration / 60,
-                        success: true,
-                        method: 'road'
-                    };
-                }
-                console.warn('OSRM returned no routes');
-                return null;
-            } catch (err) {
-                console.error("OSRM error:", err);
-                return null;
-            }
+            let timeText;
+            if (diff < 10) timeText = 'Just now';
+            else if (diff < 60) timeText = `${diff}s ago`;
+            else timeText = `${Math.floor(diff / 60)}m ago`;
+
+            document.getElementById('last-update').textContent = timeText;
         }
 
-        // 🆕 Throttled Road Distance
-        async function getThrottledRoadDistance(fromLat, fromLon, toLat, toLon) {
-            const now = Date.now();
-
-            if (now - lastRoadDistanceCall < 10000 && cachedRoadDistance) {
-                return cachedRoadDistance;
-            }
-
-            if (isCalculatingRoadDistance) {
-                return cachedRoadDistance || {
-                    distance: calculateDistance(fromLat, fromLon, toLat, toLon),
-                    duration: null,
-                    success: false,
-                    method: 'straight'
-                };
-            }
-
-            isCalculatingRoadDistance = true;
-
-            let result = await calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon);
-
-            if (!result) {
-                console.warn('⚠️ OSRM failed, using straight-line distance');
-                result = {
-                    distance: calculateDistance(fromLat, fromLon, toLat, toLon),
-                    duration: null,
-                    success: false,
-                    method: 'straight'
-                };
-            }
-
-            lastRoadDistanceCall = now;
-            cachedRoadDistance = result;
-            isCalculatingRoadDistance = false;
-            return result;
-        }
-
-        // Estimate ETA
-        function estimateETA(distanceKm, speedKmh) {
-            if (speedKmh && speedKmh > 5) {
-                return Math.max(1, Math.round((distanceKm / speedKmh) * 60));
-            }
-            return Math.max(1, Math.round((distanceKm / 30) * 60));
-        }
-
-        // Fetch student info and route
-        async function fetchStudentInfo() {
-            try {
-                console.log('🔍 Fetching student info for student_id:', student_id);
-                const res = await fetch(`/student/info/${student_id}`);
-                const data = await res.json();
-
-                console.log('📦 Student API response:', data);
-
-                if (data.success) {
-                    studentStopData = {
-                        name: data.student.stop_name,
-                        lat: data.student.stop_lat,
-                        lng: data.student.stop_lng,
-                        route_id: data.student.route_id
-                    };
-                    route_id = data.student.route_id;
-                    document.getElementById("yourStop").innerText = studentStopData.name;
-
-                    console.log('✅ Student stop data:', studentStopData);
-
-                    // Get driver info
-                    console.log('🔍 Fetching driver info...');
-                    const driverRes = await fetch(`/student/driver-info/${student_id}`);
-                    const driverData = await driverRes.json();
-                    console.log('📦 Driver API response:', driverData);
-
-                    if (driverData.success) {
-                        driver_id = driverData.driver_id;
-                        console.log('✅ Driver ID:', driver_id);
-                    }
-                } else {
-                    console.error('❌ Student info API failed:', data);
-                }
-            } catch (err) {
-                console.error("❌ Error fetching student info:", err);
-            }
-        }
-
-        // Initialize Map and Draw Route (exactly like driver)
-        async function initMap() {
-            try {
-                console.log('🔍 Fetching route stops for route_id:', route_id);
-                const res = await fetch(`/admin/routes/${route_id}/stops`);
-                const data = await res.json();
-
-                console.log('📦 Route API response:', data);
-
-                if (data.success && data.stops && data.stops.length > 0) {
-                    stops = data.stops;
-                    console.log('✅ Route stops loaded:', stops.length, stops);
-                } else {
-                    console.warn('⚠️ No stops found in API response');
-                    stops = [];
-                }
-            } catch (err) {
-                console.error("❌ Error fetching stops:", err);
-                stops = [];
-            }
-
-            if (studentStopData) {
-                map = L.map('map').setView([studentStopData.lat, studentStopData.lng], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
-
-                // Add student stop marker
-                const studentIcon = L.divIcon({
-                    className: '',
-                    html: `<div style="
-                        background: #2ed573;
-                        color: white;
-                        width: 40px;
-                        height: 40px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 20px;
-                        border: 3px solid white;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    ">🎓</div>`,
-                    iconSize: [40, 40],
-                    iconAnchor: [20, 20]
-                });
-
-                studentMarker = L.marker([studentStopData.lat, studentStopData.lng], { icon: studentIcon })
-                    .addTo(map)
-                    .bindPopup(`<b>Your Stop: ${studentStopData.name}</b>`)
-                    .openPopup();
-
-                await drawRoute();
-                updateMapMarkers();
-            }
-        }
-
-        // Draw route (exactly like driver)
-        async function drawRoute() {
-            if (stops.length === 0) {
-                console.warn('⚠️ No stops available to draw route');
-                return;
-            }
-
-            try {
-                console.log('🎨 Drawing route with', stops.length, 'stops');
-                const coords = stops.map(s => [s.longitude, s.latitude]);
-                console.log('📍 Coordinates:', coords);
-
-                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
-                    method: "POST",
-                    headers: {
-                        "Authorization": apiKey,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ coordinates: coords })
-                });
-
-                const data = await res.json();
-                console.log('🗺️ OpenRouteService response:', data);
-
-                if (data.features && data.features.length > 0) {
-                    const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-
-                    if (routeLine) {
-                        map.removeLayer(routeLine);
-                    }
-                    routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
-                    console.log('✅ Route drawn successfully');
-                } else {
-                    console.error('❌ No route features in response');
-                }
-            } catch (err) {
-                console.error("❌ Route drawing error:", err);
-            }
-        }
-
-        // Update map markers for all stops
-        function updateMapMarkers() {
-            stopMarkers.forEach(marker => map.removeLayer(marker));
-            stopMarkers = [];
-
-            stops.forEach((stop) => {
-                // Skip student's own stop (already marked)
-                if (Math.abs(stop.latitude - studentStopData.lat) < 0.0001 &&
-                    Math.abs(stop.longitude - studentStopData.lng) < 0.0001) {
-                    return;
-                }
-
-                const icon = L.divIcon({
-                    className: '',
-                    html: `<div style="
-                        background: #95a5a6;
-                        color: white;
-                        width: 30px;
-                        height: 30px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 14px;
-                        border: 2px solid white;
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-                    ">${stop.stop_order}</div>`,
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                });
-
-                const marker = L.marker([stop.latitude, stop.longitude], { icon })
-                    .addTo(map)
-                    .bindPopup(`<b>${stop.stop_name}</b><br>Stop #${stop.stop_order}`);
-
-                stopMarkers.push(marker);
-            });
-        }
-
-        // Bus marker icon (exactly like driver)
-        const busLocationIcon = L.divIcon({
-            className: '',
-            html: `<div style="
-                width: 20px; height: 20px; 
-                background: #ff4757; 
-                border: 3px solid white; 
-                border-radius: 50%;
-                box-shadow: 0 0 10px rgba(255,71,87,0.5);
-                animation: pulse-red 2s infinite;
-            "></div>
-            <style>
-                @keyframes pulse-red {
-                    0%, 100% { transform: scale(1); opacity: 1; }
-                    50% { transform: scale(1.2); opacity: 0.7; }
-                }
-            </style>`,
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            if (socket) socket.disconnect();
+            localStorage.removeItem('student_id');
+            window.location.href = '/attendance.html';
         });
 
-        // Fetch and update bus location
-        async function updateBusLocation() {
-            if (!driver_id || !studentStopData) return;
-
-            try {
-                const res = await fetch(`/driver/location/${driver_id}`);
-                const data = await res.json();
-
-                if (data.success && data.location) {
-                    const busLocation = data.location;
-                    lastUpdateTime = Date.now();
-
-                    document.getElementById("statusDot").className = "status-dot active";
-                    document.getElementById("busStatus").innerText = "On Route";
-                    document.getElementById("gpsInfo").innerText = `Last Update: ${new Date().toLocaleTimeString()}`;
-
-                    // 🆕 Calculate Road Distance using OSRM
-                    const roadData = await getThrottledRoadDistance(
-                        busLocation.latitude, busLocation.longitude,
-                        studentStopData.lat, studentStopData.lng
-                    );
-
-                    if (roadData) {
-                        document.getElementById("distance").innerText = roadData.distance.toFixed(2);
-
-                        const badge = document.getElementById("distanceBadge");
-                        if (roadData.method === 'road') {
-                            badge.innerText = 'ROAD';
-                            badge.style.background = '#2ed573';
-                        } else {
-                            badge.innerText = 'DIRECT';
-                            badge.style.background = '#ff4757';
-                        }
-
-                        let eta;
-                        if (roadData.duration && roadData.method === 'road') {
-                            eta = Math.ceil(roadData.duration);
-                        } else {
-                            eta = estimateETA(roadData.distance, 30);
-                        }
-
-                        document.getElementById("eta").innerText = eta;
-                        document.getElementById("speed").innerText = "30";
-                        document.getElementById("updateStatus").innerText =
-                            `Updated ${new Date().toLocaleTimeString()} (${roadData.method === 'road' ? 'Road' : 'Direct'})`;
-
-                        console.log(`📍 Bus distance: ${roadData.distance.toFixed(2)}km (${roadData.method}), ETA: ${eta} min`);
-                    }
-
-                    // Update bus marker
-                    if (busMarker) {
-                        busMarker.setLatLng([busLocation.latitude, busLocation.longitude]);
-                    } else {
-                        busMarker = L.marker([busLocation.latitude, busLocation.longitude], { icon: busLocationIcon })
-                            .addTo(map)
-                            .bindPopup("🚌 Your Bus");
-                    }
-
-                } else {
-                    document.getElementById("busStatus").innerText = "Bus Offline";
-                    document.getElementById("statusDot").className = "status-dot stale";
-                }
-            } catch (err) {
-                console.error("Error fetching bus location:", err);
-                document.getElementById("busStatus").innerText = "Error Tracking";
-            }
-        }
-
-        // Check attendance status
-        async function checkAttendance() {
-            try {
-                const res = await fetch(`/student/attendance-status/${student_id}?shift=${shift}`);
-                const data = await res.json();
-
-                if (data.success) {
-                    const statusDiv = document.getElementById("attendanceStatus");
-
-                    if (data.is_coming === true) {
-                        statusDiv.className = "attendance-status attendance-coming";
-                        statusDiv.innerText = "✅ Marked: Coming Today";
-                        statusDiv.style.background = "#d4edda";
-                        statusDiv.style.color = "#155724";
-                        statusDiv.style.padding = "10px";
-                        statusDiv.style.borderRadius = "5px";
-                        statusDiv.style.marginTop = "10px";
-                        statusDiv.style.textAlign = "center";
-                    } else if (data.is_coming === false) {
-                        statusDiv.className = "attendance-status attendance-not-coming";
-                        statusDiv.innerText = "❌ Marked: Not Coming Today";
-                        statusDiv.style.background = "#f8d7da";
-                        statusDiv.style.color = "#721c24";
-                        statusDiv.style.padding = "10px";
-                        statusDiv.style.borderRadius = "5px";
-                        statusDiv.style.marginTop = "10px";
-                        statusDiv.style.textAlign = "center";
-                    } else {
-                        statusDiv.className = "attendance-status";
-                        statusDiv.innerText = "✅ Status: Coming Today (default)";
-                        statusDiv.style.background = "#d1ecf1";
-                        statusDiv.style.color = "#0c5460";
-                        statusDiv.style.padding = "10px";
-                        statusDiv.style.borderRadius = "5px";
-                        statusDiv.style.marginTop = "10px";
-                        statusDiv.style.textAlign = "center";
-                    }
-                }
-            } catch (err) {
-                console.error("Error checking attendance:", err);
-            }
-        }
-
-        // Mark attendance
-        let pendingAttendance = null;
-
-        function markAttendance(isComing) {
-            pendingAttendance = isComing;
-            const modal = document.getElementById("attendanceModal");
-            const message = document.getElementById("attendanceMessage");
-            const reasonInput = document.getElementById("reasonInput");
-
-            if (isComing) {
-                message.innerText = "Mark yourself as COMING today?";
-                reasonInput.style.display = "none";
-            } else {
-                message.innerText = "Mark yourself as NOT COMING today?";
-                reasonInput.style.display = "block";
-            }
-
-            modal.style.display = "block";
-        }
-
-        function closeAttendanceModal() {
-            document.getElementById("attendanceModal").style.display = "none";
-            pendingAttendance = null;
-        }
-
-        async function confirmAttendance() {
-            try {
-                const reason = document.getElementById("reasonInput").value;
-
-                const res = await fetch('/student/mark-attendance', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        student_id: student_id,
-                        is_coming: pendingAttendance,
-                        shift: shift,
-                        reason: pendingAttendance ? null : reason
-                    })
-                });
-
-                const data = await res.json();
-
-                if (data.success) {
-                    alert(pendingAttendance ? "✅ Marked as Coming!" : "❌ Marked as Not Coming");
-                    checkAttendance();
-                } else {
-                    alert("Error: " + data.message);
-                }
-            } catch (err) {
-                alert("Error marking attendance");
-            }
-
-            closeAttendanceModal();
-        }
-
-        // Refresh tracking
-        function refreshTracking() {
-            cachedRoadDistance = null;
-            updateBusLocation();
-            checkAttendance();
-            console.log("🔄 Tracking refreshed");
-        }
-
-        // Auto-refresh
-        setInterval(updateBusLocation, 10000);
-        setInterval(() => {
-            if ((Date.now() - lastUpdateTime) / 1000 > 30) {
-                document.getElementById("statusDot").className = "status-dot stale";
-                document.getElementById("statusText").innerText = "Tracking Stale";
-            }
-        }, 5000);
-
-        // Close modal on outside click
-        window.onclick = function (event) {
-            const modal = document.getElementById('attendanceModal');
-            if (event.target == modal) {
-                closeAttendanceModal();
-            }
-        }
-
-        // Initialize
-        console.log(`🎓 Student Tracking - Student ID: ${student_id}, Shift: ${shift}`);
-        fetchStudentInfo().then(() => {
-            if (route_id) {
-                initMap().then(() => {
-                    updateBusLocation();
-                    checkAttendance();
-                });
-            }
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            fetchStudentData();
         });
     </script>
-
 </body>
 
 </html>
