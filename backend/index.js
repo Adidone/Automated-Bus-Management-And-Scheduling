@@ -1,6 +1,6 @@
 const express = require("express");
-const http = require("http"); // Added for Socket.IO
-const socketIo = require("socket.io"); // Added for WebSockets
+const http = require("http");
+const socketIo = require("socket.io");
 const pool = require("./db");
 require("dotenv").config();
 const cors = require("cors");
@@ -11,38 +11,13 @@ const { geoApi } = require("./geoapi.js");
 const PORT = process.env.PORT || 5555;
 
 const app = express();
-const server = http.createServer(app); // Wrap app in HTTP server for Socket.IO
-
-// Initialize Socket.IO
-let io;
-const initSocket = (server) => {
-  io = socketIo(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
-  io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
-    // Student subscribes to a driver's updates (based on driver_id)
-    socket.on('subscribe-driver', (driverId) => {
-      socket.join(`driver-${driverId}`);
-      console.log(`User ${socket.id} subscribed to driver-${driverId}`);
-      // Optionally, send current location on subscribe
-      pool.query("SELECT latitude, longitude, updated_at FROM driver_live_location WHERE driver_id = $1", [driverId])
-        .then(result => {
-          if (result.rows.length > 0) {
-            socket.emit('location-update', result.rows[0]);
-          }
-        })
-        .catch(err => console.error('Error fetching initial location:', err));
-    });
-
-    socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
-    });
-  });
-  return io;
-};
-
-// Call initSocket to set io
-io = initSocket(server);
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
 app.use(express.json());
 
@@ -53,28 +28,47 @@ app.use(cors({
 app.use(express.static(path.join(__dirname, "driver")));
 app.use(express.static(path.join(__dirname, "admin")));
 
+// Make io accessible to routes via middleware
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Routes
 const AdminRoutes = require("./routes/AdminRoute.js");
 const StudentRoutes = require("./routes/StudentRoute.js");
 const DriverRoutes = require("./routes/DriverRoute.js");
 
 // API Endpoints
-
-// Admin
 app.use("/admin", AdminRoutes);
-
-// Student
 app.use("/student", StudentRoutes);
-
-// Driver
 app.use("/driver", DriverRoutes);
 
-// Export io for use in controllers (after initialization)
-module.exports.io = io;
+// WebSocket connections for real-time tracking
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('subscribe-driver', (driverId) => {
+    socket.join(`driver-${driverId}`);
+    console.log(`User ${socket.id} subscribed to driver-${driverId}`);
+    
+    pool.query("SELECT latitude, longitude, updated_at FROM driver_live_location WHERE driver_id = $1", [driverId])
+      .then(result => {
+        if (result.rows.length > 0) {
+          socket.emit('location-update', result.rows[0]);
+        }
+      })
+      .catch(err => console.error('Error fetching initial location:', err));
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 
 app.get("/geoapi", async (req, res) => {
   try {
-    const geo = await geoApi(); // Await result
+    const geo = await geoApi();
     if (geo) {
       res.json(geo);
     } else {
@@ -116,7 +110,6 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Use server.listen instead of app.listen for Socket.IO support
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server with WebSockets running on port ${PORT}`);
 });

@@ -1,5 +1,4 @@
 const pool = require("../../db");
-const { io } = require("../../index"); // Import io from index.js
 
 const UpdateLocation = async (req, res) => {
     try {
@@ -11,6 +10,9 @@ const UpdateLocation = async (req, res) => {
                 success: false
             });
         }
+
+        // Get io from request object
+        const io = req.io;
 
         // 1️⃣ Update driver location
         await pool.query(
@@ -24,11 +26,14 @@ const UpdateLocation = async (req, res) => {
         );
 
         // Emit location update to subscribed students
-        io.to(`driver-${driver_id}`).emit('location-update', {
-            latitude,
-            longitude,
-            updated_at: new Date()
-        });
+        if (io) {
+            io.to(`driver-${driver_id}`).emit('location-update', {
+                latitude,
+                longitude,
+                updated_at: new Date()
+            });
+            console.log(`📡 Emitted location update for driver ${driver_id}`);
+        }
 
         // 2️⃣ Get all incomplete stops for route 4
         const stopsRes = await pool.query(
@@ -97,8 +102,8 @@ const UpdateLocation = async (req, res) => {
         VALUES ($1, $2, $3, $4, $5, $6, $7);
     `, [
                 driver_id,
-                4, // Adjust if route_id is dynamic
-                'Morning', // Adjust based on shift logic
+                4,
+                'Morning',
                 summary.total_students,
                 summary.present_students,
                 summary.absent_students,
@@ -112,7 +117,6 @@ const UpdateLocation = async (req, res) => {
 
             console.log("🧹 Auto-cleared all tables after trip completion!");
         }
-
 
         return res.status(200).json({
             message: "Location updated",
