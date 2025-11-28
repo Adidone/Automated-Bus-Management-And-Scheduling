@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -292,52 +291,64 @@
         }
     </style>
 </head>
-
 <body>
     <div class="container">
-        <header>
-            <h1>🚌 Track Your Bus</h1>
-            <button id="logout-btn">Logout</button>
-        </header>
-
-        <div class="info-card">
-            <div class="student-info">
-                <h2 id="student-name">Loading...</h2>
-                <p id="student-details"></p>
-            </div>
-            <div class="route-info">
-                <h3>Route Information</h3>
-                <p id="route-name">Route: -</p>
-                <p id="driver-name">Driver: -</p>
-                <p id="bus-number">Bus: -</p>
+        <!-- Student ID Input Section -->
+        <div id="student-input-section">
+            <div class="input-card">
+                <h1>🚌 Track Your Bus</h1>
+                <p>Enter your Student ID to track your bus in real-time</p>
+                <input type="number" id="student-id-input" placeholder="Enter Student ID" />
+                <button id="track-btn">Start Tracking</button>
             </div>
         </div>
 
-        <div class="status-bar">
-            <div class="status-item">
-                <span class="label">Connection:</span>
-                <span id="connection-status" class="value">Connecting...</span>
-            </div>
-            <div class="status-item">
-                <span class="label">Last Update:</span>
-                <span id="last-update" class="value">-</span>
-            </div>
-            <div class="status-item">
-                <span class="label">Distance:</span>
-                <span id="distance-info" class="value">-</span>
-            </div>
-        </div>
+        <!-- Tracking Section (hidden initially) -->
+        <div id="tracking-section" style="display: none;">
+            <header>
+                <h1>🚌 Track Your Bus</h1>
+                <button id="change-student-btn">Change Student</button>
+            </header>
 
-        <div id="map"></div>
+            <div class="info-card">
+                <div class="student-info">
+                    <h2 id="student-name">Loading...</h2>
+                    <p id="student-details"></p>
+                </div>
+                <div class="route-info">
+                    <h3>Route Information</h3>
+                    <p id="route-name">Route: -</p>
+                    <p id="driver-name">Driver: -</p>
+                    <p id="bus-number">Bus: -</p>
+                </div>
+            </div>
 
-        <div class="stops-section">
-            <h3>🚏 Route Stops</h3>
-            <div id="stops-list"></div>
-        </div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="label">Connection:</span>
+                    <span id="connection-status" class="value">Connecting...</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Last Update:</span>
+                    <span id="last-update" class="value">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Distance:</span>
+                    <span id="distance-info" class="value">-</span>
+                </div>
+            </div>
 
-        <div class="eta-card">
-            <h3>Estimated Arrival</h3>
-            <p id="eta-info">Calculating...</p>
+            <div id="map"></div>
+
+            <div class="stops-section">
+                <h3>🚏 Route Stops</h3>
+                <div id="stops-list"></div>
+            </div>
+
+            <div class="eta-card">
+                <h3>Estimated Arrival</h3>
+                <p id="eta-info">Calculating...</p>
+            </div>
         </div>
     </div>
 
@@ -348,6 +359,7 @@
         let studentData = null;
         let driverId = null;
         let busIcon, studentIcon, stopIcon, completedStopIcon;
+        let currentStudentId = null;
 
         // Initialize icons
         function initIcons() {
@@ -380,52 +392,58 @@
 
         // Initialize map
         function initMap() {
-            map = L.map('map').setView([19.0760, 72.8777], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-            initIcons();
+            if (!map) {
+                map = L.map('map').setView([19.0760, 72.8777], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                initIcons();
+            }
         }
 
         // Fetch student data
-        async function fetchStudentData() {
+        async function fetchStudentData(studentId) {
             try {
-                const studentId = localStorage.getItem('student_id');
-                if (!studentId) {
-                    window.location.href = '/attendance.html';
-                    return;
-                }
-
                 const response = await fetch(`${API_BASE}/student/profile/${studentId}`);
                 const data = await response.json();
 
                 if (data.success) {
                     studentData = data.data;
                     driverId = studentData.driver_id;
-                    updateStudentInfo();
-                    connectWebSocket();
-                    fetchRouteStops();
-
-                    // Add student location marker if available
-                    if (studentData.latitude && studentData.longitude) {
-                        studentMarker = L.marker([studentData.latitude, studentData.longitude], {
-                            icon: studentIcon
-                        }).addTo(map).bindPopup(`<b>Your Location</b><br>${studentData.stop_name}`);
-                        map.setView([studentData.latitude, studentData.longitude], 14);
-                    }
+                    currentStudentId = studentId;
+                    
+                    // Show tracking section, hide input section
+                    document.getElementById('student-input-section').style.display = 'none';
+                    document.getElementById('tracking-section').style.display = 'block';
+                    
+                    // Initialize map after section is visible
+                    setTimeout(() => {
+                        initMap();
+                        updateStudentInfo();
+                        connectWebSocket();
+                        fetchRouteStops();
+                        
+                        // Add student location marker if available
+                        if (studentData.latitude && studentData.longitude) {
+                            studentMarker = L.marker([studentData.latitude, studentData.longitude], {
+                                icon: studentIcon
+                            }).addTo(map).bindPopup(`<b>Your Location</b><br>${studentData.stop_name}`);
+                            map.setView([studentData.latitude, studentData.longitude], 14);
+                        }
+                    }, 100);
                 } else {
-                    alert('Failed to load student data');
+                    alert('Student not found. Please check the ID and try again.');
                 }
             } catch (err) {
                 console.error('Error fetching student data:', err);
-                alert('Error loading data');
+                alert('Error loading data. Please try again.');
             }
         }
 
         // Update student info display
         function updateStudentInfo() {
             document.getElementById('student-name').textContent = studentData.student_name;
-            document.getElementById('student-details').textContent =
+            document.getElementById('student-details').textContent = 
                 `Roll No: ${studentData.roll_no} | Stop: ${studentData.stop_name}`;
             document.getElementById('route-name').textContent = `Route: ${studentData.route_name}`;
             document.getElementById('driver-name').textContent = `Driver: ${studentData.driver_name}`;
@@ -434,13 +452,17 @@
 
         // Connect to WebSocket
         function connectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+
             socket = io(API_BASE);
 
             socket.on('connect', () => {
                 console.log('WebSocket connected:', socket.id);
                 document.getElementById('connection-status').textContent = 'Connected ✓';
                 document.getElementById('connection-status').style.color = '#10b981';
-
+                
                 // Subscribe to driver updates
                 socket.emit('subscribe-driver', driverId);
             });
@@ -477,16 +499,16 @@
             // Calculate distance if student location exists
             if (studentMarker) {
                 const distance = calculateDistance(
-                    studentData.latitude,
-                    studentData.longitude,
-                    lat,
+                    studentData.latitude, 
+                    studentData.longitude, 
+                    lat, 
                     lng
                 );
                 document.getElementById('distance-info').textContent = `${distance.toFixed(2)} km away`;
-
+                
                 // Calculate ETA (assuming 30 km/h average speed)
                 const eta = (distance / 30) * 60; // minutes
-                document.getElementById('eta-info').textContent =
+                document.getElementById('eta-info').textContent = 
                     eta < 1 ? 'Arriving soon!' : `~${Math.round(eta)} minutes`;
             }
 
@@ -553,10 +575,10 @@
             const R = 6371; // Earth's radius in km
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             return R * c;
         }
 
@@ -574,19 +596,50 @@
             document.getElementById('last-update').textContent = timeText;
         }
 
-        // Logout
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            if (socket) socket.disconnect();
-            localStorage.removeItem('student_id');
-            window.location.href = '/attendance.html';
+        // Reset and go back to student input
+        function resetTracking() {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            // Clear map markers
+            if (map) {
+                map.eachLayer((layer) => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+            }
+            
+            busMarker = null;
+            studentMarker = null;
+            studentData = null;
+            driverId = null;
+            currentStudentId = null;
+            
+            document.getElementById('tracking-section').style.display = 'none';
+            document.getElementById('student-input-section').style.display = 'block';
+            document.getElementById('student-id-input').value = '';
+        }
+
+        // Event Listeners
+        document.getElementById('track-btn').addEventListener('click', () => {
+            const studentId = document.getElementById('student-id-input').value.trim();
+            if (studentId) {
+                fetchStudentData(studentId);
+            } else {
+                alert('Please enter a valid Student ID');
+            }
         });
 
-        // Initialize on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            initMap();
-            fetchStudentData();
+        // Allow Enter key to submit
+        document.getElementById('student-id-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('track-btn').click();
+            }
         });
+
+        document.getElementById('change-student-btn').addEventListener('click', resetTracking);
     </script>
 </body>
-
 </html>
