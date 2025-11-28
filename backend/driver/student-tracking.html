@@ -293,73 +293,61 @@
 </head>
 <body>
     <div class="container">
-        <!-- Student ID Input Section -->
-        <div id="student-input-section">
-            <div class="input-card">
-                <h1>🚌 Track Your Bus</h1>
-                <p>Enter your Student ID to track your bus in real-time</p>
-                <input type="number" id="student-id-input" placeholder="Enter Student ID" />
-                <button id="track-btn">Start Tracking</button>
+        <header>
+            <h1>🚌 Track Your Bus</h1>
+            <button id="logout-btn">Logout</button>
+        </header>
+
+        <div class="info-card">
+            <div class="student-info">
+                <h2 id="student-name">Loading...</h2>
+                <p id="student-details"></p>
+            </div>
+            <div class="route-info">
+                <h3>Route Information</h3>
+                <p id="route-name">Route: -</p>
+                <p id="driver-name">Driver: -</p>
+                <p id="bus-number">Bus: -</p>
             </div>
         </div>
 
-        <!-- Tracking Section (hidden initially) -->
-        <div id="tracking-section" style="display: none;">
-            <header>
-                <h1>🚌 Track Your Bus</h1>
-                <button id="change-student-btn">Change Student</button>
-            </header>
-
-            <div class="info-card">
-                <div class="student-info">
-                    <h2 id="student-name">Loading...</h2>
-                    <p id="student-details"></p>
-                </div>
-                <div class="route-info">
-                    <h3>Route Information</h3>
-                    <p id="route-name">Route: -</p>
-                    <p id="driver-name">Driver: -</p>
-                    <p id="bus-number">Bus: -</p>
-                </div>
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="label">Connection:</span>
+                <span id="connection-status" class="value">Connecting...</span>
             </div>
-
-            <div class="status-bar">
-                <div class="status-item">
-                    <span class="label">Connection:</span>
-                    <span id="connection-status" class="value">Connecting...</span>
-                </div>
-                <div class="status-item">
-                    <span class="label">Last Update:</span>
-                    <span id="last-update" class="value">-</span>
-                </div>
-                <div class="status-item">
-                    <span class="label">Distance:</span>
-                    <span id="distance-info" class="value">-</span>
-                </div>
+            <div class="status-item">
+                <span class="label">Last Update:</span>
+                <span id="last-update" class="value">-</span>
             </div>
-
-            <div id="map"></div>
-
-            <div class="stops-section">
-                <h3>🚏 Route Stops</h3>
-                <div id="stops-list"></div>
+            <div class="status-item">
+                <span class="label">Distance:</span>
+                <span id="distance-info" class="value">-</span>
             </div>
+        </div>
 
-            <div class="eta-card">
-                <h3>Estimated Arrival</h3>
-                <p id="eta-info">Calculating...</p>
-            </div>
+        <div id="map"></div>
+
+        <div class="stops-section">
+            <h3>🚏 Route Stops</h3>
+            <div id="stops-list"></div>
+        </div>
+
+        <div class="eta-card">
+            <h3>Estimated Arrival</h3>
+            <p id="eta-info">Calculating...</p>
         </div>
     </div>
 
     <script>
         const API_BASE = window.location.origin;
+        const STUDENT_ID = 13; // Hardcoded student ID
+        
         let map, busMarker, studentMarker;
         let socket;
         let studentData = null;
         let driverId = null;
         let busIcon, studentIcon, stopIcon, completedStopIcon;
-        let currentStudentId = null;
 
         // Initialize icons
         function initIcons() {
@@ -392,51 +380,39 @@
 
         // Initialize map
         function initMap() {
-            if (!map) {
-                map = L.map('map').setView([19.0760, 72.8777], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(map);
-                initIcons();
-            }
+            map = L.map('map').setView([19.0760, 72.8777], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            initIcons();
         }
 
         // Fetch student data
-        async function fetchStudentData(studentId) {
+        async function fetchStudentData() {
             try {
-                const response = await fetch(`${API_BASE}/student/profile/${studentId}`);
+                const response = await fetch(`${API_BASE}/student/profile/${STUDENT_ID}`);
                 const data = await response.json();
 
                 if (data.success) {
                     studentData = data.data;
                     driverId = studentData.driver_id;
-                    currentStudentId = studentId;
+                    updateStudentInfo();
+                    connectWebSocket();
+                    fetchRouteStops();
                     
-                    // Show tracking section, hide input section
-                    document.getElementById('student-input-section').style.display = 'none';
-                    document.getElementById('tracking-section').style.display = 'block';
-                    
-                    // Initialize map after section is visible
-                    setTimeout(() => {
-                        initMap();
-                        updateStudentInfo();
-                        connectWebSocket();
-                        fetchRouteStops();
-                        
-                        // Add student location marker if available
-                        if (studentData.latitude && studentData.longitude) {
-                            studentMarker = L.marker([studentData.latitude, studentData.longitude], {
-                                icon: studentIcon
-                            }).addTo(map).bindPopup(`<b>Your Location</b><br>${studentData.stop_name}`);
-                            map.setView([studentData.latitude, studentData.longitude], 14);
-                        }
-                    }, 100);
+                    // Add student location marker if available
+                    if (studentData.latitude && studentData.longitude) {
+                        studentMarker = L.marker([studentData.latitude, studentData.longitude], {
+                            icon: studentIcon
+                        }).addTo(map).bindPopup(`<b>Your Location</b><br>${studentData.stop_name}`);
+                        map.setView([studentData.latitude, studentData.longitude], 14);
+                    }
                 } else {
-                    alert('Student not found. Please check the ID and try again.');
+                    alert('Failed to load student data');
                 }
             } catch (err) {
                 console.error('Error fetching student data:', err);
-                alert('Error loading data. Please try again.');
+                alert('Error loading data');
             }
         }
 
@@ -452,10 +428,6 @@
 
         // Connect to WebSocket
         function connectWebSocket() {
-            if (socket) {
-                socket.disconnect();
-            }
-
             socket = io(API_BASE);
 
             socket.on('connect', () => {
@@ -596,50 +568,17 @@
             document.getElementById('last-update').textContent = timeText;
         }
 
-        // Reset and go back to student input
-        function resetTracking() {
-            if (socket) {
-                socket.disconnect();
-            }
-            
-            // Clear map markers
-            if (map) {
-                map.eachLayer((layer) => {
-                    if (layer instanceof L.Marker) {
-                        map.removeLayer(layer);
-                    }
-                });
-            }
-            
-            busMarker = null;
-            studentMarker = null;
-            studentData = null;
-            driverId = null;
-            currentStudentId = null;
-            
-            document.getElementById('tracking-section').style.display = 'none';
-            document.getElementById('student-input-section').style.display = 'block';
-            document.getElementById('student-id-input').value = '';
-        }
-
-        // Event Listeners
-        document.getElementById('track-btn').addEventListener('click', () => {
-            const studentId = document.getElementById('student-id-input').value.trim();
-            if (studentId) {
-                fetchStudentData(studentId);
-            } else {
-                alert('Please enter a valid Student ID');
-            }
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            if (socket) socket.disconnect();
+            window.location.href = '/attendance.html';
         });
 
-        // Allow Enter key to submit
-        document.getElementById('student-id-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('track-btn').click();
-            }
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            fetchStudentData();
         });
-
-        document.getElementById('change-student-btn').addEventListener('click', resetTracking);
     </script>
 </body>
 </html>
