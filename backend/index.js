@@ -12,12 +12,37 @@ const PORT = process.env.PORT || 5555;
 
 const app = express();
 const server = http.createServer(app); // Wrap app in HTTP server for Socket.IO
-const io = socketIo(server, { // Initialize Socket.IO
-  cors: {
-    origin: "*", // Allow your frontend; restrict in production
-    methods: ["GET", "POST"]
-  }
-});
+
+// Initialize Socket.IO
+let io;
+const initSocket = (server) => {
+  io = socketIo(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
+  io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
+    // Student subscribes to a driver's updates (based on driver_id)
+    socket.on('subscribe-driver', (driverId) => {
+      socket.join(`driver-${driverId}`);
+      console.log(`User ${socket.id} subscribed to driver-${driverId}`);
+      // Optionally, send current location on subscribe
+      pool.query("SELECT latitude, longitude, updated_at FROM driver_live_location WHERE driver_id = $1", [driverId])
+        .then(result => {
+          if (result.rows.length > 0) {
+            socket.emit('location-update', result.rows[0]);
+          }
+        })
+        .catch(err => console.error('Error fetching initial location:', err));
+    });
+
+    socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
+    });
+  });
+  return io;
+};
+
+// Call initSocket to set io
+io = initSocket(server);
 
 app.use(express.json());
 
@@ -44,30 +69,7 @@ app.use("/student", StudentRoutes);
 // Driver
 app.use("/driver", DriverRoutes);
 
-// WebSocket connections for real-time tracking
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
-  // Student subscribes to a driver's updates (based on driver_id)
-  socket.on('subscribe-driver', (driverId) => {
-    socket.join(`driver-${driverId}`);
-    console.log(`User ${socket.id} subscribed to driver-${driverId}`);
-    // Optionally, send current location on subscribe
-    pool.query("SELECT latitude, longitude, updated_at FROM driver_live_location WHERE driver_id = $1", [driverId])
-      .then(result => {
-        if (result.rows.length > 0) {
-          socket.emit('location-update', result.rows[0]);
-        }
-      })
-      .catch(err => console.error('Error fetching initial location:', err));
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
-});
-
-// Export io for use in controllers
+// Export io for use in controllers (after initialization)
 module.exports.io = io;
 
 app.get("/geoapi", async (req, res) => {
