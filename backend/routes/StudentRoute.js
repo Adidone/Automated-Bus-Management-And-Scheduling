@@ -5,6 +5,8 @@ const MarkAttendance = require("../controllers/Student/MarkAttendance");
 const GetDriverInfo = require("../controllers/Student/GetDriverInfo");
 const GetStudentInfo = require("../controllers/Student/GetStudentInfo");
 const GetAttendanceStatus = require("../controllers/Student/GetAttendanceStatus");
+const GetProfile = require("../controllers/Student/GetProfile");
+const GetRouteStops = require("../controllers/Student/GetRouteStops");
 const router = express.Router();
 
 router.post("/add",AddStudent);
@@ -16,6 +18,9 @@ router.get("/driver-info/:studentId", GetDriverInfo);
 
 // Get today's attendance status
 router.get("/attendance-status/:studentId", GetAttendanceStatus);
+
+router.get("/profile/:id", GetProfile);
+router.get("/route-stops/:route_id", GetRouteStops);
 
 
 module.exports = router;
