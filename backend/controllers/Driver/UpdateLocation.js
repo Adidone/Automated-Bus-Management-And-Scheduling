@@ -26,10 +26,11 @@ const UpdateLocation = async (req, res) => {
         );
 
         // Emit location update to subscribed students
+        // Emit location update to subscribed students
         if (io) {
             io.to(`driver-${driver_id}`).emit('location-update', {
-                latitude,
-                longitude,
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
                 updated_at: new Date()
             });
             console.log(`📡 Emitted location update for driver ${driver_id}`);

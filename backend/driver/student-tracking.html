@@ -465,7 +465,7 @@
                 console.log('📍 Fetching initial bus location for driver:', driverId);
                 document.getElementById('debug-api').textContent = 'Fetching bus location...';
                 
-                const response = await fetch(`${API_BASE}/driver/location/${driverId}`);
+                const response = await fetch(`${API_BASE}/student/live-location/${driverId}`);
                 
                 // Check if response is OK
                 if (!response.ok) {

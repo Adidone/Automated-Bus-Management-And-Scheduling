@@ -7,6 +7,7 @@ const GetStudentInfo = require("../controllers/Student/GetStudentInfo");
 const GetAttendanceStatus = require("../controllers/Student/GetAttendanceStatus");
 const GetProfile = require("../controllers/Student/GetProfile");
 const GetRouteStops = require("../controllers/Student/GetRouteStops");
+const GetDriverLiveLocation = require("../controllers/Student/GetDriverLiveLocation");
 const router = express.Router();
 
 router.post("/add",AddStudent);
@@ -21,6 +22,7 @@ router.get("/attendance-status/:studentId", GetAttendanceStatus);
 
 router.get("/profile/:id", GetProfile);
 router.get("/route-stops/:route_id", GetRouteStops);
+router.get("/live-location/:driverId", GetDriverLiveLocation);
 
 
 module.exports = router;
