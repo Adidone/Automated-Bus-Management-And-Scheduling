@@ -366,8 +366,7 @@
         <div class="modal-content">
             <h3>📝 Confirm Attendance</h3>
             <p id="attendanceMessage"></p>
-            <input type="text" id="reasonInput" placeholder="Reason (optional)"
-                style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+            <input type="text" id="reasonInput" placeholder="Reason (optional)" style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="closeAttendanceModal()">Cancel</button>
                 <button class="modal-btn confirm" onclick="confirmAttendance()">Confirm</button>
@@ -415,21 +414,40 @@
         // OSRM Road Distance Calculation
         async function calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon) {
             try {
+                // Validate coordinates
+                if (!fromLat || !fromLon || !toLat || !toLon || 
+                    isNaN(fromLat) || isNaN(fromLon) || isNaN(toLat) || isNaN(toLon)) {
+                    console.warn('Invalid coordinates for OSRM');
+                    return null;
+                }
+
                 const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
+                console.log('🔍 OSRM URL:', url);
+                
                 const res = await fetch(url);
+                
+                if (!res.ok) {
+                    console.warn('OSRM request failed:', res.status);
+                    return null;
+                }
+                
                 const data = await res.json();
+                console.log('📦 OSRM response:', data);
 
                 if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    console.log('✅ OSRM road distance calculated');
                     return {
                         distance: data.routes[0].distance / 1000,
                         duration: data.routes[0].duration / 60,
                         success: true,
                         method: 'road'
                     };
+                } else {
+                    console.warn('OSRM no routes found:', data.code);
                 }
                 return null;
             } catch (err) {
-                console.error("OSRM error:", err);
+                console.error("❌ OSRM error:", err);
                 return null;
             }
         }
@@ -500,9 +518,9 @@
                     // Get driver info
                     const driverRes = await fetch(`/student/driver-info/${student_id}`);
                     const driverData = await driverRes.json();
-
+                    
                     console.log('📦 Driver data:', driverData);
-
+                    
                     if (driverData.success) {
                         driver_id = driverData.driver_id;
                         console.log('✅ Driver ID:', driver_id);
@@ -578,10 +596,29 @@
                 return;
             }
 
-            try {
-                console.log('🎨 Drawing route...');
-                const coords = stops.map(s => [s.longitude, s.latitude]);
+            if (stops.length < 2) {
+                console.warn('⚠️ Need at least 2 stops to draw route');
+                return;
+            }
 
+            try {
+                console.log('🎨 Drawing route with', stops.length, 'stops');
+                const coords = stops.map(s => {
+                    // Validate coordinates
+                    if (!s.longitude || !s.latitude || isNaN(s.longitude) || isNaN(s.latitude)) {
+                        console.warn('Invalid stop coordinates:', s);
+                        return null;
+                    }
+                    return [parseFloat(s.longitude), parseFloat(s.latitude)];
+                }).filter(c => c !== null);
+
+                if (coords.length < 2) {
+                    console.warn('⚠️ Not enough valid coordinates');
+                    return;
+                }
+
+                console.log('📍 Valid coordinates:', coords.length);
+                
                 const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
                     method: "POST",
                     headers: {
@@ -591,8 +628,14 @@
                     body: JSON.stringify({ coordinates: coords })
                 });
 
-                const data = await res.json();
+                if (!res.ok) {
+                    console.warn('OpenRouteService request failed:', res.status);
+                    return;
+                }
 
+                const data = await res.json();
+                console.log('🗺️ Route response:', data);
+                
                 if (data.features && data.features.length > 0) {
                     const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
 
@@ -600,10 +643,12 @@
                         map.removeLayer(routeLine);
                     }
                     routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
-                    console.log('✅ Route drawn');
+                    console.log('✅ Route drawn with', routeCoords.length, 'points');
+                } else {
+                    console.warn('⚠️ No route features in response');
                 }
             } catch (err) {
-                console.error("Route drawing error:", err);
+                console.error("❌ Route drawing error:", err);
             }
         }
 
@@ -669,17 +714,35 @@
 
         // Fetch and update bus location (POLLING - like driver.html)
         async function updateBusLocation() {
-            if (!driver_id || !studentStopData) return;
+            if (!driver_id || !studentStopData) {
+                console.warn('⚠️ Missing driver_id or studentStopData');
+                return;
+            }
 
             try {
                 console.log('📍 Fetching bus location for driver:', driver_id);
                 const res = await fetch(`/student/live-location/${driver_id}`);
+                
+                if (!res.ok) {
+                    console.warn('Bus location fetch failed:', res.status);
+                    document.getElementById("busStatus").innerText = "Bus Offline";
+                    document.getElementById("statusDot").className = "status-dot stale";
+                    return;
+                }
+                
                 const data = await res.json();
-
-                console.log('📦 Bus location:', data);
+                console.log('📦 Bus location response:', data);
 
                 if (data.success && data.location) {
                     const busLocation = data.location;
+                    
+                    // Validate bus location coordinates
+                    if (!busLocation.latitude || !busLocation.longitude ||
+                        isNaN(busLocation.latitude) || isNaN(busLocation.longitude)) {
+                        console.warn('Invalid bus coordinates');
+                        return;
+                    }
+
                     lastUpdateTime = Date.now();
 
                     document.getElementById("statusDot").className = "status-dot active";
@@ -688,8 +751,10 @@
 
                     // Calculate Road Distance using OSRM
                     const roadData = await getThrottledRoadDistance(
-                        busLocation.latitude, busLocation.longitude,
-                        studentStopData.lat, studentStopData.lng
+                        parseFloat(busLocation.latitude), 
+                        parseFloat(busLocation.longitude),
+                        parseFloat(studentStopData.lat), 
+                        parseFloat(studentStopData.lng)
                     );
 
                     if (roadData) {
@@ -728,12 +793,14 @@
                     }
 
                 } else {
+                    console.warn('⚠️ No bus location in response');
                     document.getElementById("busStatus").innerText = "Bus Offline";
                     document.getElementById("statusDot").className = "status-dot stale";
                 }
             } catch (err) {
-                console.error("Error fetching bus location:", err);
+                console.error("❌ Error fetching bus location:", err);
                 document.getElementById("busStatus").innerText = "Error Tracking";
+                document.getElementById("statusDot").className = "status-dot stale";
             }
         }
 
@@ -759,7 +826,7 @@
                         statusDiv.style.background = "#d1ecf1";
                         statusDiv.style.color = "#0c5460";
                     }
-
+                    
                     statusDiv.style.padding = "10px";
                     statusDiv.style.borderRadius = "5px";
                     statusDiv.style.marginTop = "10px";
@@ -835,7 +902,7 @@
 
         // Auto-refresh bus location every 10 seconds (POLLING - like driver)
         setInterval(updateBusLocation, 10000);
-
+        
         // Check stale status
         setInterval(() => {
             if ((Date.now() - lastUpdateTime) / 1000 > 30) {
