@@ -414,7 +414,7 @@
         async function fetchInitialBusLocation() {
             try {
                 console.log('📍 Fetching initial bus location for driver:', driverId);
-                const response = await fetch(`${API_BASE}/driver/live-location/${driverId}`);
+                const response = await fetch(`${API_BASE}/driver/location/${driverId}`);
                 const data = await response.json();
                 
                 console.log('Bus location response:', data);
