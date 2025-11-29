@@ -55,6 +55,28 @@
             color: #667eea;
         }
 
+        .demo-config {
+            background: #e3f2fd;
+            margin: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #2196f3;
+            font-size: 0.9em;
+        }
+
+        .demo-config h4 {
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+
+        .demo-config code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #d32f2f;
+            font-weight: 600;
+        }
+
         .info-card {
             background: white;
             margin: 20px;
@@ -272,6 +294,14 @@
             <button id="logout-btn">Logout</button>
         </header>
 
+        <!-- Demo Configuration Display -->
+        <div class="demo-config">
+            <h4>📌 Demo Configuration:</h4>
+            Student ID: <code id="config-student">13</code> | 
+            Driver ID: <code id="config-driver">3</code> | 
+            Route ID: <code id="config-route">4</code>
+        </div>
+
         <div class="info-card">
             <div class="student-info">
                 <h2 id="student-name">Loading...</h2>
@@ -302,12 +332,13 @@
 
         <div id="map"></div>
 
-        <!-- Debug Info (Remove in production) -->
+        <!-- Debug Info -->
         <div class="debug-info">
             <strong>🔍 Debug Info:</strong>
             WebSocket Events: <span id="debug-events">0</span><br>
             Last Location: <span id="debug-location">Waiting...</span><br>
-            Driver ID: <span id="debug-driver">-</span>
+            Driver ID: <span id="debug-driver">-</span><br>
+            API Status: <span id="debug-api">Checking...</span>
         </div>
 
         <div class="stops-section">
@@ -322,15 +353,28 @@
     </div>
 
     <script>
+        // ============================================
+        // DEMO CONFIGURATION - Hardcoded IDs
+        // ============================================
+        const DEMO_CONFIG = {
+            STUDENT_ID: 13,
+            DRIVER_ID: 3,
+            ROUTE_ID: 4
+        };
+
         const API_BASE = window.location.origin;
-        const STUDENT_ID = 13; // Hardcoded student ID
         
         let map, busMarker, studentMarker, routeLine;
         let socket;
         let studentData = null;
-        let driverId = null;
+        let driverId = DEMO_CONFIG.DRIVER_ID;
         let busIcon, studentIcon, stopIcon, completedStopIcon;
         let eventCount = 0;
+
+        // Update config display
+        document.getElementById('config-student').textContent = DEMO_CONFIG.STUDENT_ID;
+        document.getElementById('config-driver').textContent = DEMO_CONFIG.DRIVER_ID;
+        document.getElementById('config-route').textContent = DEMO_CONFIG.ROUTE_ID;
 
         // Initialize icons
         function initIcons() {
@@ -374,18 +418,21 @@
         // Fetch student data
         async function fetchStudentData() {
             try {
-                console.log('📡 Fetching student data for ID:', STUDENT_ID);
-                const response = await fetch(`${API_BASE}/student/profile/${STUDENT_ID}`);
+                console.log('📡 Fetching student data for ID:', DEMO_CONFIG.STUDENT_ID);
+                document.getElementById('debug-api').textContent = 'Fetching student...';
+                
+                const response = await fetch(`${API_BASE}/student/profile/${DEMO_CONFIG.STUDENT_ID}`);
                 const data = await response.json();
 
                 if (data.success) {
                     studentData = data.data;
-                    driverId = studentData.driver_id;
+                    driverId = studentData.driver_id || DEMO_CONFIG.DRIVER_ID; // Fallback to demo ID
                     
                     console.log('✅ Student Data:', studentData);
                     console.log('🚗 Driver ID:', driverId);
                     
                     document.getElementById('debug-driver').textContent = driverId;
+                    document.getElementById('debug-api').textContent = 'Student loaded ✓';
                     
                     updateStudentInfo();
                     connectWebSocket();
@@ -402,11 +449,13 @@
                     }
                 } else {
                     console.error('❌ Failed to load student data:', data);
+                    document.getElementById('debug-api').textContent = 'Student failed ✗';
                     alert('Failed to load student data');
                 }
             } catch (err) {
                 console.error('❌ Error fetching student data:', err);
-                alert('Error loading data');
+                document.getElementById('debug-api').textContent = 'Error ✗';
+                alert('Error loading data: ' + err.message);
             }
         }
 
@@ -414,9 +463,16 @@
         async function fetchInitialBusLocation() {
             try {
                 console.log('📍 Fetching initial bus location for driver:', driverId);
-                const response = await fetch(`${API_BASE}/driver/location/${driverId}`);
-                const data = await response.json();
+                document.getElementById('debug-api').textContent = 'Fetching bus location...';
                 
+                const response = await fetch(`${API_BASE}/driver/location/${driverId}`);
+                
+                // Check if response is OK
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
                 console.log('Bus location response:', data);
                 
                 if (data.success && data.location) {
@@ -426,15 +482,18 @@
                     
                     document.getElementById('debug-location').textContent = 
                         `${data.location.latitude.toFixed(6)}, ${data.location.longitude.toFixed(6)}`;
+                    document.getElementById('debug-api').textContent = 'All loaded ✓';
                 } else {
                     console.log('⚠️ No initial bus location available');
                     document.getElementById('eta-info').textContent = 'Bus not started yet';
                     document.getElementById('debug-location').textContent = 'Not available';
+                    document.getElementById('debug-api').textContent = 'No bus location';
                 }
             } catch (err) {
                 console.error('❌ Error fetching initial location:', err);
                 document.getElementById('eta-info').textContent = 'Location unavailable';
-                document.getElementById('debug-location').textContent = 'Error';
+                document.getElementById('debug-location').textContent = 'Error: ' + err.message;
+                document.getElementById('debug-api').textContent = 'Location error ✗';
             }
         }
 
@@ -498,7 +557,7 @@
             } else {
                 busMarker = L.marker([lat, lng], { icon: busIcon })
                     .addTo(map)
-                    .bindPopup(`<b>Bus Location</b><br>Driver: ${studentData.driver_name}`);
+                    .bindPopup(`<b>Bus Location</b><br>Driver: ${studentData ? studentData.driver_name : 'Demo Driver'}`);
                 console.log('✅ Bus marker created');
             }
 
@@ -535,8 +594,10 @@
         // Fetch and display route stops
         async function fetchRouteStops() {
             try {
-                console.log('🚏 Fetching route stops for route:', studentData.route_id);
-                const response = await fetch(`${API_BASE}/student/route-stops/${studentData.route_id}`);
+                const routeId = studentData ? studentData.route_id : DEMO_CONFIG.ROUTE_ID;
+                console.log('🚏 Fetching route stops for route:', routeId);
+                
+                const response = await fetch(`${API_BASE}/student/route-stops/${routeId}`);
                 const data = await response.json();
 
                 if (data.success) {
@@ -645,6 +706,7 @@
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', () => {
             console.log('🚀 Student Tracking App Starting...');
+            console.log('📌 Demo Config:', DEMO_CONFIG);
             initMap();
             fetchStudentData();
         });
