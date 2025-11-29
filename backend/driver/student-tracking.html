@@ -366,7 +366,8 @@
         <div class="modal-content">
             <h3>📝 Confirm Attendance</h3>
             <p id="attendanceMessage"></p>
-            <input type="text" id="reasonInput" placeholder="Reason (optional)" style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+            <input type="text" id="reasonInput" placeholder="Reason (optional)"
+                style="display: none; width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="closeAttendanceModal()">Cancel</button>
                 <button class="modal-btn confirm" onclick="confirmAttendance()">Confirm</button>
@@ -411,48 +412,44 @@
             return R * c;
         }
 
-        // OSRM Road Distance Calculation
+
+
+        // Updated calculateRoadDistanceOSRM
         async function calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon) {
             try {
-                // Validate coordinates
-                if (!fromLat || !fromLon || !toLat || !toLon || 
+                if (!fromLat || !fromLon || !toLat || !toLon ||
                     isNaN(fromLat) || isNaN(fromLon) || isNaN(toLat) || isNaN(toLon)) {
                     console.warn('Invalid coordinates for OSRM');
                     return null;
                 }
 
-                const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=false`;
-                console.log('🔍 OSRM URL:', url);
-                
+                const url = `https://your-app.onrender.com/api/calculate-distance?fromLat=${fromLat}&fromLon=${fromLon}&toLat=${toLat}&toLon=${toLon}`; // Use deployed URL
+                console.log('🔍 Backend distance URL:', url);
+
                 const res = await fetch(url);
-                
+
                 if (!res.ok) {
-                    console.warn('OSRM request failed:', res.status);
+                    console.warn('Backend request failed:', res.status);
                     return null;
                 }
-                
-                const data = await res.json();
-                console.log('📦 OSRM response:', data);
 
-                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                    console.log('✅ OSRM road distance calculated');
-                    return {
-                        distance: data.routes[0].distance / 1000,
-                        duration: data.routes[0].duration / 60,
-                        success: true,
-                        method: 'road'
-                    };
+                const data = await res.json();
+                console.log('📦 Backend response:', data);
+
+                if (data.success) {
+                    console.log('✅ Road distance calculated via backend');
+                    return data;
                 } else {
-                    console.warn('OSRM no routes found:', data.code);
+                    console.warn('Backend fallback to straight-line');
+                    return data;
                 }
-                return null;
             } catch (err) {
-                console.error("❌ OSRM error:", err);
+                console.error("❌ Backend distance error:", err);
                 return null;
             }
         }
 
-        // Throttled Road Distance
+        // Throttled Road Distance (unchanged)
         async function getThrottledRoadDistance(fromLat, fromLon, toLat, toLon) {
             const now = Date.now();
 
@@ -473,7 +470,7 @@
             let result = await calculateRoadDistanceOSRM(fromLat, fromLon, toLat, toLon);
 
             if (!result) {
-                console.warn('⚠️ OSRM failed, using straight-line distance');
+                console.warn('⚠️ Backend failed, using straight-line distance');
                 result = {
                     distance: calculateDistance(fromLat, fromLon, toLat, toLon),
                     duration: null,
@@ -487,6 +484,7 @@
             isCalculatingRoadDistance = false;
             return result;
         }
+
 
         // Estimate ETA
         function estimateETA(distanceKm, speedKmh) {
@@ -518,9 +516,9 @@
                     // Get driver info
                     const driverRes = await fetch(`/student/driver-info/${student_id}`);
                     const driverData = await driverRes.json();
-                    
+
                     console.log('📦 Driver data:', driverData);
-                    
+
                     if (driverData.success) {
                         driver_id = driverData.driver_id;
                         console.log('✅ Driver ID:', driver_id);
@@ -618,7 +616,7 @@
                 }
 
                 console.log('📍 Valid coordinates:', coords.length);
-                
+
                 const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
                     method: "POST",
                     headers: {
@@ -635,7 +633,7 @@
 
                 const data = await res.json();
                 console.log('🗺️ Route response:', data);
-                
+
                 if (data.features && data.features.length > 0) {
                     const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
 
@@ -722,20 +720,20 @@
             try {
                 console.log('📍 Fetching bus location for driver:', driver_id);
                 const res = await fetch(`/student/live-location/${driver_id}`);
-                
+
                 if (!res.ok) {
                     console.warn('Bus location fetch failed:', res.status);
                     document.getElementById("busStatus").innerText = "Bus Offline";
                     document.getElementById("statusDot").className = "status-dot stale";
                     return;
                 }
-                
+
                 const data = await res.json();
                 console.log('📦 Bus location response:', data);
 
                 if (data.success && data.location) {
                     const busLocation = data.location;
-                    
+
                     // Validate bus location coordinates
                     if (!busLocation.latitude || !busLocation.longitude ||
                         isNaN(busLocation.latitude) || isNaN(busLocation.longitude)) {
@@ -751,9 +749,9 @@
 
                     // Calculate Road Distance using OSRM
                     const roadData = await getThrottledRoadDistance(
-                        parseFloat(busLocation.latitude), 
+                        parseFloat(busLocation.latitude),
                         parseFloat(busLocation.longitude),
-                        parseFloat(studentStopData.lat), 
+                        parseFloat(studentStopData.lat),
                         parseFloat(studentStopData.lng)
                     );
 
@@ -826,7 +824,7 @@
                         statusDiv.style.background = "#d1ecf1";
                         statusDiv.style.color = "#0c5460";
                     }
-                    
+
                     statusDiv.style.padding = "10px";
                     statusDiv.style.borderRadius = "5px";
                     statusDiv.style.marginTop = "10px";
@@ -902,7 +900,7 @@
 
         // Auto-refresh bus location every 10 seconds (POLLING - like driver)
         setInterval(updateBusLocation, 10000);
-        
+
         // Check stale status
         setInterval(() => {
             if ((Date.now() - lastUpdateTime) / 1000 > 30) {
