@@ -64,6 +64,7 @@
     <script>
         const socket = io();
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+        let routeLine = null;
         const stops = [
             { latitude: 16.57865479, longitude: 74.29502221 },
             { latitude: 16.58377964, longitude: 74.30980429 },
@@ -85,23 +86,44 @@
                 const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
                     method: "POST",
                     headers: {
+                        // NOTE: This key is crucial for OpenRouteService
                         "Authorization": apiKey,
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({ coordinates: coords })
                 });
 
+                // CRITICAL: Check if the API response was successful
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    console.error("ORS API Error:", errorData);
+                    throw new Error(`ORS API failed with status: ${res.status}`);
+                }
+
                 const data = await res.json();
+                // Map GeoJSON coordinates from [lng, lat] to Leaflet's [lat, lng]
                 const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
 
                 if (routeLine) {
                     map.removeLayer(routeLine);
                 }
                 routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+
+                // Optional: Adjust map to fit the route
+                map.fitBounds(routeLine.getBounds());
+
             } catch (err) {
                 console.error("Route drawing error:", err);
+                // Fallback to drawing a straight line if API fails
+                const straightCoords = stops.map(s => [s.latitude, s.longitude]);
+                routeLine = L.polyline(straightCoords, { color: "#ff7f00", weight: 3, dashArray: '5, 10' }).addTo(map);
             }
         }
+
+        // ... (Your custom icon and socket logic remains the same) ...
+
+        // 🆕 FIX 2: Call drawRoute() to make the route appear
+        drawRoute();
 
 
 
