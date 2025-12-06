@@ -399,6 +399,7 @@
         let debugMode = false;
         let busMarker = null;
         let accuracyCircle = null;
+        const socket = io();
 
         // 🆕 OSRM Road Distance Variables
         let lastRoadDistanceCall = 0;
@@ -852,6 +853,15 @@
                     handleLocationError,
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
                 );
+                navigator.geolocation.watchPosition((position)=>{
+                    const {latitude, longitude} = position.coords;
+                    socket.emit('send-location',{latitude,longitude})
+                },
+                (error)=>{
+                    console.error("Socket GPS error:", error);
+                },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });   
+
                 console.log("✅ GPS tracking started");
             } else {
                 alert("Geolocation not supported");

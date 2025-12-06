@@ -22,7 +22,7 @@ const io = socketIo(server, {
 app.use(express.json());
 
 app.use(cors({
-    origin: "*"
+  origin: "*"
 }));
 
 app.use(express.static(path.join(__dirname, "driver")));
@@ -51,15 +51,11 @@ io.on('connection', (socket) => {
   socket.on('subscribe-driver', (driverId) => {
     socket.join(`driver-${driverId}`);
     console.log(`User ${socket.id} subscribed to driver-${driverId}`);
-    
-    pool.query("SELECT latitude, longitude, updated_at FROM driver_live_location WHERE driver_id = $1", [driverId])
-      .then(result => {
-        if (result.rows.length > 0) {
-          socket.emit('location-update', result.rows[0]);
-        }
-      })
-      .catch(err => console.error('Error fetching initial location:', err));
   });
+
+  socket.on('send-location', (data) => {
+    io.emit('receive-location', { id: socket.id, ...data });
+  })
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
