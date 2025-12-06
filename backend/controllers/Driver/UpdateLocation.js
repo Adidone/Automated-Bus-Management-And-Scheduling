@@ -35,16 +35,19 @@ const UpdateLocation = async (req, res) => {
             });
             console.log(`📡 Emitted location update for driver ${driver_id}`);
         }
-
+        const route_id_query = await pool.query(
+            `SELECT route_id FROM trips WHERE driver_id = $1`,
+            [driver_id]
+        )
         // 2️⃣ Get all incomplete stops for route 4
         const stopsRes = await pool.query(
             `SELECT s.id, s.name, s.latitude, s.longitude, rs.stop_order
              FROM route_stops rs
              JOIN stops s ON rs.stop_id = s.id
              LEFT JOIN completed_stops cs ON cs.stop_id = s.id AND cs.driver_id = $1
-             WHERE rs.route_id = 4 AND cs.stop_id IS NULL
+             WHERE rs.route_id = $2 AND cs.stop_id IS NULL
              ORDER BY rs.stop_order ASC`,
-            [driver_id]
+            [driver_id,route_id_query.rows[0].route_id]
         );
 
         // 3️⃣ Check proximity to each incomplete stop
@@ -72,7 +75,7 @@ const UpdateLocation = async (req, res) => {
         // Check if all stops completed
         const totalStops = await pool.query(
             "SELECT COUNT(*) FROM route_stops WHERE route_id = $1",
-            [4]
+            [route_id_query.rows[0].route_id]
         );
 
         const completedStopss = await pool.query(
@@ -103,7 +106,7 @@ const UpdateLocation = async (req, res) => {
         VALUES ($1, $2, $3, $4, $5, $6, $7);
     `, [
                 driver_id,
-                4,
+                route_id_query.rows[0].route_id,
                 'Morning',
                 summary.total_students,
                 summary.present_students,
