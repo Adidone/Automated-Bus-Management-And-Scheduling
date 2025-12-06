@@ -50,6 +50,7 @@
 
         socket.on("receive-location", (data) => {
             const { id, latitude, longitude } = data;
+            console.log(`Received location for ${id}: (${latitude}, ${longitude})`);
             map.setView([latitude, longitude], 16);  // Centers map on location
             if (markers[id]) {
                 markers[id].setLatLng([latitude, longitude]);  // Update existing marker
