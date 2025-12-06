@@ -31,16 +31,26 @@
         .bus-marker-dot {
             width: 20px;
             height: 20px;
-            background: #ff4757; /* Bright Red */
+            background: #ff4757;
+            /* Bright Red */
             border: 3px solid white;
             border-radius: 50%;
-            box-shadow: 0 0 10px rgba(255,71,87,0.5);
+            box-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
             animation: pulse-red 2s infinite;
         }
 
         @keyframes pulse-red {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
         }
     </style>
 </head>
@@ -53,6 +63,14 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
+        const stops = [
+            { latitude: 16.57865479, longitude: 74.29502221 },
+            { latitude: 16.58377964, longitude: 74.30980429 },
+            { latitude: 16.62039870, longitude: 74.29770568 },
+            { latitude: 16.63783643, longitude: 74.27932786 },
+            { latitude: 16.65451617, longitude: 74.26181243 }
+        ];
 
         const map = L.map("map").setView([0, 0], 10);
 
@@ -61,6 +79,31 @@
         }).addTo(map);
 
         const markers = {};
+        async function drawRoute() {
+            try {
+                const coords = stops.map(s => [s.longitude, s.latitude]);
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": apiKey,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ coordinates: coords })
+                });
+
+                const data = await res.json();
+                const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                }
+                routeLine = L.polyline(routeCoords, { color: "#667eea", weight: 5 }).addTo(map);
+            } catch (err) {
+                console.error("Route drawing error:", err);
+            }
+        }
+
+
 
         // 🆕 Define the Custom Icon (Red Dot with Animation)
         const busIcon = L.divIcon({
@@ -73,7 +116,7 @@
         socket.on("receive-location", (data) => {
             const { id, latitude, longitude } = data;
             console.log(`Received location for ${id}: (${latitude}, ${longitude})`);
-            
+
             // map.setView([latitude, longitude], 16); // Removed this to prevent map from constantly jumping
 
             if (markers[id]) {
@@ -83,7 +126,7 @@
                 markers[id] = L.marker([latitude, longitude], { icon: busIcon })
                     .addTo(map)
                     .bindPopup(`Bus ID: ${id}`); // Add a popup for identification
-                
+
                 // Set initial view on the first received location
                 map.setView([latitude, longitude], 16);
             }
