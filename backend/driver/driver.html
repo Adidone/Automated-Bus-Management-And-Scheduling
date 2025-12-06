@@ -961,6 +961,7 @@
         // Initialize
         console.log(`🚌 Driver App - Shift: ${shift}`);
         initMap().then(() => {
+            socket.emit('subscribe-driver', driver_id);
             fetchNextStop();
             fetchStopsWithStudents();
             startTracking();
