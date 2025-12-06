@@ -855,8 +855,8 @@
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
                 );
                 navigator.geolocation.watchPosition((position)=>{
-                    const {driver_id: driver_id,latitude, longitude} = position.coords;
-                    socket.emit('send-location',{driver_id,latitude,longitude})
+                    const {latitude, longitude} = position.coords;
+                    socket.emit('send-location',{driver_id:driver_id,latitude,longitude})
                 },
                 (error)=>{
                     console.error("Socket GPS error:", error);
