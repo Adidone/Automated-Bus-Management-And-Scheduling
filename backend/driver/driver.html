@@ -385,7 +385,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-polyline/1.1.1/polyline.js"></script>
     <script>
         const driver_id = 3;
-        const route_id = null;
+        const route_id = 4;
         const shift = 'Morning';
 
         let stops = [];
@@ -612,12 +612,11 @@
         // Initialize Map
         async function initMap() {
             try {
-                const res = await fetch(`/driver/driver-route/${driver_id}`);
+                const res = await fetch(`/admin/routes/${route_id}/stops`);
                 const data = await res.json();
 
                 if (data.success && data.stops) {
                     stops = data.stops;
-                    route_id = data.route_id;
                 } else {
                     stops = [
                         { latitude: 16.57865479, longitude: 74.29502221 },

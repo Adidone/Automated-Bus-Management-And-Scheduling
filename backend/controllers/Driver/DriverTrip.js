@@ -3,7 +3,7 @@ const pool = require("../../db");
 const DriverTrip = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { id } = req.params; // driver_id
+    const { id } = req.body; // driver_id
     if (!id) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -52,8 +52,11 @@ const DriverTrip = async (req, res) => {
 
     // Step 3: Format response data
     const stops = routeStops.rows.map(stop => ({
-      latitude: stop.latitude,
-      longitude: stop.longitude
+      order: stop.stop_order,
+      name: stop.stop_name,
+      lat: stop.latitude,
+      lng: stop.longitude,
+      distance_from_prev_km: stop.distance_from_previous_stop || 0
     }));
 
     await client.query('COMMIT');
