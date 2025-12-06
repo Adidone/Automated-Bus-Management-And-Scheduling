@@ -65,6 +65,7 @@
         const socket = io();
         const apiKey = "5b3ce3597851110001cf6248060d2fdd37ed411cba69c80b4ab04135";
         let routeLine = null;
+        let studentMarker = null;
         const stops = [
             { latitude: 16.57865479, longitude: 74.29502221 },
             { latitude: 16.58377964, longitude: 74.30980429 },
@@ -72,6 +73,25 @@
             { latitude: 16.63783643, longitude: 74.27932786 },
             { latitude: 16.65451617, longitude: 74.26181243 }
         ];
+
+        const studentStopIcon = L.divIcon({
+            className: 'student-stop-icon',
+            html: `<div style="
+            width: 30px; height: 30px; 
+            background: #667eea; /* Blue */
+            color: white;
+            border: 4px solid #fff; 
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        ">S</div>`, /* 'S' for Student */
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
 
         const map = L.map("map").setView([0, 0], 10);
 
@@ -120,9 +140,39 @@
             }
         }
 
+        let data ={
+            name: "Gokul Shirgaao Stop",
+            latitude: 16.63783643,
+            longitude: 74.27932786
+        }
+
+        async function placeStudentStopMarker() {
+            try {
+                // 🆕 You need a new backend endpoint to get the student's stop details
+                
+                
+                    const { name, latitude, longitude } = data;
+
+                    if (studentMarker) {
+                        map.removeLayer(studentMarker);
+                    }
+
+                    studentMarker = L.marker([latitude, longitude], { icon: studentStopIcon })
+                        .addTo(map)
+                        .bindPopup(`<b>Your Stop:</b> ${name}`);
+
+                    // Optional: Center the map on the student's stop when loaded
+                    map.setView([latitude, longitude], 14);
+                
+            } catch (err) {
+                console.error("Error placing student stop marker:", err);
+            }
+        }
+
         // ... (Your custom icon and socket logic remains the same) ...
 
         // 🆕 FIX 2: Call drawRoute() to make the route appear
+        placeStudentStopMarker();
         drawRoute();
 
 
