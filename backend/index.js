@@ -54,7 +54,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send-location', (data) => {
-    io.emit('receive-location', { id: socket.id, ...data });
+    io.emit('receive-location', {
+      id: data.driver_id,
+      latitude: data.latitude,
+      longitude: data.longitude
+    });
   })
 
   socket.on('disconnect', () => {

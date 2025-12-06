@@ -855,7 +855,7 @@
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
                 );
                 navigator.geolocation.watchPosition((position)=>{
-                    const {latitude, longitude} = position.coords;
+                    const {driver_id: driver_id,latitude, longitude} = position.coords;
                     socket.emit('send-location',{latitude,longitude})
                 },
                 (error)=>{
