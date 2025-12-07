@@ -621,21 +621,21 @@
                     console.log("✅ Stops loaded:", stops);
                 } else {
                     stops = [
-                        { latitude: 16.57865479, longitude: 74.29502221 },
-                        { latitude: 16.58377964, longitude: 74.30980429 },
-                        { latitude: 16.62039870, longitude: 74.29770568 },
-                        { latitude: 16.63783643, longitude: 74.27932786 },
-                        { latitude: 16.65451617, longitude: 74.26181243 }
+                        { latitude: 16.69612371, longitude: 74.21847876 },  // RANKALA BUS STAND
+                        { latitude: 16.67844726, longitude: 74.22397193 },  // NIRMAN CHOWK
+                        { latitude: 16.67450067, longitude: 74.23676070 },  // SUBHASH NAGAR CHOWK
+                        { latitude: 16.66266040, longitude: 74.23993644 },  // RK NAGAR
+                        { latitude: 16.65451617, longitude: 74.26181243 }   // KIT
                     ];
                 }
             } catch (err) {
                 console.error("Error fetching stops:", err);
                 stops = [
-                    { latitude: 16.57865479, longitude: 74.29502221 },
-                    { latitude: 16.58377964, longitude: 74.30980429 },
-                    { latitude: 16.62039870, longitude: 74.29770568 },
-                    { latitude: 16.63783643, longitude: 74.27932786 },
-                    { latitude: 16.65451617, longitude: 74.26181243 }
+                    { latitude: 16.69612371, longitude: 74.21847876 },  // RANKALA BUS STAND
+                    { latitude: 16.67844726, longitude: 74.22397193 },  // NIRMAN CHOWK
+                    { latitude: 16.67450067, longitude: 74.23676070 },  // SUBHASH NAGAR CHOWK
+                    { latitude: 16.66266040, longitude: 74.23993644 },  // RK NAGAR
+                    { latitude: 16.65451617, longitude: 74.26181243 }   // KIT
                 ];
             }
 
@@ -856,14 +856,14 @@
                     handleLocationError,
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
                 );
-                navigator.geolocation.watchPosition((position)=>{
-                    const {latitude, longitude} = position.coords;
-                    socket.emit('send-location',{driver_id:driver_id,latitude,longitude})
+                navigator.geolocation.watchPosition((position) => {
+                    const { latitude, longitude } = position.coords;
+                    socket.emit('send-location', { driver_id: driver_id, latitude, longitude })
                 },
-                (error)=>{
-                    console.error("Socket GPS error:", error);
-                },
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });   
+                    (error) => {
+                        console.error("Socket GPS error:", error);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
 
                 console.log("✅ GPS tracking started");
             } else {
