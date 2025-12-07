@@ -55,8 +55,8 @@ const DriverTrip = async (req, res) => {
     const stops = routeStops.rows.map(stop => ({
       order: stop.stop_order,
       name: stop.stop_name,
-      lat: stop.latitude,
-      lng: stop.longitude,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
       distance_from_prev_km: stop.distance_from_previous_stop || 0
     }));
 
