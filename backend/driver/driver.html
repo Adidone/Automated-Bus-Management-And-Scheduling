@@ -384,8 +384,8 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-polyline/1.1.1/polyline.js"></script>
     <script>
-        const driver_id = 3;
-        const route_id = 4;
+        const driver_id = 4;
+        const route_id = null;
         const shift = 'Morning';
 
         let stops = [];
@@ -612,11 +612,13 @@
         // Initialize Map
         async function initMap() {
             try {
-                const res = await fetch(`/admin/routes/${route_id}/stops`);
+                const res = await fetch(`/driver/driver-routes/${driver_id}`);
                 const data = await res.json();
 
                 if (data.success && data.stops) {
                     stops = data.stops;
+                    route_id = data.route_id;
+                    console.log("✅ Stops loaded:", stops);
                 } else {
                     stops = [
                         { latitude: 16.57865479, longitude: 74.29502221 },

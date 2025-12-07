@@ -3,7 +3,7 @@ const pool = require("../../db");
 const DriverTrip = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { id } = req.body; // driver_id
+    const { id } = req.params; // driver_id
     if (!id) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -27,6 +27,7 @@ const DriverTrip = async (req, res) => {
     }
 
     const route_id = tripResult.rows[0].route_id;
+    console.log("🚚 Driver Trip Route ID:", route_id);
 
     // Step 2: Fetch stops for that route with their distance & coordinates
     const routeStops = await client.query(`
