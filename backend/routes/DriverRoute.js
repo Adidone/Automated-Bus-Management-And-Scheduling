@@ -14,7 +14,7 @@ const router = express.Router();
 
 router.post("/add",AddDriver);
 router.post("/stopstudents",StopStudents);
-router.get("/driver-route/:id",DriverTrip);
+router.get("/driver-routes/:id",DriverTrip);
 router.post("/update-location", UpdateLocation);
 router.get("/eta/:driverId", GetETA);
 router.post("/reset-route", ResetRoute);
