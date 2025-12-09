@@ -612,7 +612,7 @@
         // Initialize Map
         async function initMap() {
             try {
-                const res = await fetch(`https://automated-bus-management-and-scheduling-1.onrender.com/driver/driver-routes/${driver_id}`);
+                const res = await fetch(`/driver/driver-routes/${driver_id}`);
                 const data = await res.json();
 
                 if (data.success && data.stops) {
