@@ -25,15 +25,6 @@ app.use(cors({
   origin: "*"
 }));
 
-app.use(express.static(path.join(__dirname, "driver")));
-app.use(express.static(path.join(__dirname, "admin")));
-
-// Make io accessible to routes via middleware
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
-
 // Routes
 const AdminRoutes = require("./routes/AdminRoute.js");
 const StudentRoutes = require("./routes/StudentRoute.js");
@@ -43,6 +34,17 @@ const DriverRoutes = require("./routes/DriverRoute.js");
 app.use("/admin", AdminRoutes);
 app.use("/student", StudentRoutes);
 app.use("/driver", DriverRoutes);
+
+app.use(express.static(path.join(__dirname, "driver")));
+app.use(express.static(path.join(__dirname, "admin")));
+
+// Make io accessible to routes via middleware
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+
 
 // WebSocket connections for real-time tracking
 io.on('connection', (socket) => {
