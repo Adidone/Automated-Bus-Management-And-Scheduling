@@ -16,7 +16,7 @@ router.post("/add",AddDriver);
 router.post("/stopstudents",StopStudents);
 router.get("/driver-routes/:id",DriverTrip);
 router.post("/update-location", UpdateLocation);
-router.get("/eta/:id", GetETA);
+router.get("/eta/:driverId", GetETA);
 router.post("/reset-route", ResetRoute);
 router.get("/completed-stops/:driverId", GetCompletedStops);
 router.get("/location/:driverId", GetLiveLocations);

@@ -3,6 +3,8 @@ const axios = require("axios");
 
 const GetETA = async (req, res) => {
     try {
+        const driverId = req.params;
+
         const driver_id = req.params.driverId;
 
         // 1️⃣ Get driver current location
