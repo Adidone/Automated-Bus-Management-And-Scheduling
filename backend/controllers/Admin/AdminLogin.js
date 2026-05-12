@@ -8,8 +8,8 @@ const AdminLogin = async (req,res) =>{
         if(username == "admin" && password == "123456"){
             await client.query('COMMIT');
             return res.status(201).json({
-                sucess:true,
-                message:"Logged In SucessFully",
+                success:true,
+                message:"Logged In Successfully",
                 username,
                 password
             })
@@ -17,7 +17,7 @@ const AdminLogin = async (req,res) =>{
         else{
             await client.query('ROLLBACK');
             return res.status(409).json({
-                sucess:false,
+                success:false,
                 message:"Invalid Credentials",
                 
             })
@@ -27,7 +27,7 @@ const AdminLogin = async (req,res) =>{
         await client.query('ROLLBACK');
         return res.status(500).json({
             message:err.message,
-            sucess:false
+            success:false
         })
     }
 }
