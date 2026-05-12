@@ -27,10 +27,10 @@ const LiveTrips = async (req, res) => {
     const tripResult = await client.query(tripsQuery);
 
     if (tripResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
+      return res.status(200).json({
         message: "No active or scheduled trips found",
-        success: false,
+        success: true,
+        data: []
       });
     }
 
@@ -66,10 +66,11 @@ const LiveTrips = async (req, res) => {
 
     // Step 4: Combine trips + stops
     const liveTrips = tripResult.rows.map((trip) => ({
-      trip_id: trip.trip_id,
+      id: trip.trip_id,
       route_id: trip.route_id,
       route_name: trip.route_name,
       driver_name: trip.driver_name,
+      bus_id: trip.bus_id,
       bus_number: trip.bus_number,
       bus_status: trip.bus_status,
       shift: trip.trip_shift,
@@ -77,13 +78,12 @@ const LiveTrips = async (req, res) => {
       stops: routeStopMap[trip.route_id] || [],
     }));
 
-    await client.query('COMMIT');
     // Step 5: Send response
     return res.status(200).json({
       message: "Live trips fetched successfully",
       success: true,
       total_trips: liveTrips.length,
-      trips: liveTrips,
+      data: liveTrips,
     });
 
   } catch (error) {

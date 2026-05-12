@@ -13,6 +13,7 @@ const GetRoutes = require("../controllers/Admin/GetRoutes.js");
 const GetDrivers = require("../controllers/Admin/GetDrivers.js");
 const GetStops = require("../controllers/Admin/GetStops.js");
 const GetStudents = require("../controllers/Admin/GetStudents.js");
+const DeleteTrip = require("../controllers/Admin/DeleteTrip.js");
 const AddStudent = require("../controllers/Student/AddStudent.js");
 
 router.post("/login", AdminLogin);
@@ -29,5 +30,6 @@ router.get("/routes", GetRoutes);
 router.get("/drivers", GetDrivers);
 router.get("/stops", GetStops);
 router.get("/students", GetStudents);
+router.delete("/deletetrip/:id", DeleteTrip);
 
 module.exports = router;
