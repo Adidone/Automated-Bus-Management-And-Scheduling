@@ -9,6 +9,9 @@ const AddStop = require("../controllers/Admin/AddStop.js");
 const AddRouteStop = require("../controllers/Admin/AddRouteStop.js");
 const LiveTrips = require("../controllers/Admin/LiveTrips.js");
 const GetBuses = require("../controllers/Admin/GetBuses.js");
+const GetRoutes = require("../controllers/Admin/GetRoutes.js");
+const GetDrivers = require("../controllers/Admin/GetDrivers.js");
+const GetStops = require("../controllers/Admin/GetStops.js");
 
 router.post("/login", AdminLogin);
 router.post("/addbus", AddBus);
@@ -19,5 +22,8 @@ router.post("/addstop", AddStop);
 router.post("/routes-stop", AddRouteStop);
 router.get("/livetrips", LiveTrips);
 router.get("/buses", GetBuses);
+router.get("/routes", GetRoutes);
+router.get("/drivers", GetDrivers);
+router.get("/stops", GetStops);
 
 module.exports = router;
