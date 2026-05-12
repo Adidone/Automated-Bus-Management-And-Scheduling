@@ -8,9 +8,11 @@ const GetAttendanceStatus = require("../controllers/Student/GetAttendanceStatus"
 const GetProfile = require("../controllers/Student/GetProfile");
 const GetRouteStops = require("../controllers/Student/GetRouteStops");
 const GetDriverLiveLocation = require("../controllers/Student/GetDriverLiveLocation");
+const StudentLogin = require("../controllers/Student/StudentLogin");
 const router = express.Router();
 
 router.post("/add",AddStudent);
+router.post("/login", StudentLogin);
 router.post("/mark-attendance", MarkAttendance);
 router.get("/info/:studentId", GetStudentInfo);
 
