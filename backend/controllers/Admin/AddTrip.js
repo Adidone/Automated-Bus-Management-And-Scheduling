@@ -6,7 +6,13 @@ const AddTrip = async (req, res) => {
     const client = await pool.connect();
     try {
 
-        const { route_id, bus_id, driver_id, shift } = req.body;
+        let { route_id, bus_id, driver_id, shift } = req.body;
+        
+        // Fix for shift_time enum: capitalize first letter (e.g., 'morning' -> 'Morning')
+        if (shift) {
+            shift = shift.charAt(0).toUpperCase() + shift.slice(1).toLowerCase();
+        }
+
         if (!route_id || !bus_id || !driver_id || !shift) {
             await client.query('ROLLBACK');
             return res.status(400).json({

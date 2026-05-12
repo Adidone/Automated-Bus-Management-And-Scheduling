@@ -3,7 +3,7 @@ const pool = require("../../db");
 const StopStudents = async (req, res) => {
     try {
         const { stop_ids } = req.body; // Array of stop IDs
-        
+
         if (!stop_ids || !Array.isArray(stop_ids) || stop_ids.length === 0) {
             return res.status(400).json({
                 message: "stop_ids must be a non-empty array",
@@ -29,7 +29,7 @@ const StopStudents = async (req, res) => {
         `;
 
         const result = await pool.query(getStudentsQuery, [stop_ids]);
-        
+
         // Group students by stop
         const studentsByStop = {};
         result.rows.forEach(student => {
