@@ -10,6 +10,7 @@ const GetDrivers = async (req, res) => {
                 d.email, 
                 d.address, 
                 d.liscence_no,
+                d.status,
                 r.name as assigned_route,
                 b.bus_number as assigned_bus
             FROM drivers d
