@@ -45,11 +45,11 @@ const GetStopStudentCount = async (req, res) => {
                 rs.stop_order,
                 COUNT(DISTINCT s.id) as total_students,
                 COUNT(DISTINCT CASE 
-                    WHEN sa.is_coming = TRUE OR sa.is_coming IS NULL 
+                    WHEN sa.status = 'present' OR sa.status IS NULL 
                     THEN s.id 
                 END) as coming_today,
                 COUNT(DISTINCT CASE 
-                    WHEN sa.is_coming = FALSE 
+                    WHEN sa.status = 'absent' 
                     THEN s.id 
                 END) as not_coming_today
             FROM route_stops rs
