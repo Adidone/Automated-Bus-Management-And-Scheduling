@@ -11,12 +11,13 @@ const AddRouteStop = async (req, res) => {
     const { route_id, stop_id, stop_order } = req.body;
     
     if (!route_id || !stop_id || !stop_order) {
-      await client.query('ROLLBACK');
       return res.status(400).json({
         message: "Missing required fields: route_id, stop_id, stop_order",
         success: false,
       });
     }
+
+    await client.query('BEGIN');
 
     const route = await client.query("SELECT * FROM routes WHERE id = $1", [route_id]);
     const stop = await client.query("SELECT * FROM stops WHERE id = $1", [stop_id]);
@@ -80,9 +81,10 @@ const AddRouteStop = async (req, res) => {
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error("Error adding stop to route:", err.response?.data || err.message);
+    const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+    console.error("Error adding stop to route:", errorMsg);
     return res.status(500).json({
-      message: "Internal Server Error",
+      message: errorMsg || "Internal Server Error",
       success: false,
     });
   }

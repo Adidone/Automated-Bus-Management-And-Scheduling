@@ -2,13 +2,15 @@ const pool = require("../../db");
 
 const GetStopStudentCount = async (req, res) => {
     try {
-        let { driver_id, shift } = req.query; // Morning or Evening
+        let { driver_id, shift } = req.query;
 
-        if (shift) {
-            shift = shift.charAt(0).toUpperCase() + shift.slice(1).toLowerCase();
-        } else {
-            shift = 'Morning';
+        if (!shift) {
+            const hour = new Date().getHours();
+            shift = hour < 14 ? 'Morning' : 'Evening';
         }
+        
+        // Ensure proper casing for the DB if needed, but we'll use LOWER anyway
+        shift = shift.charAt(0).toUpperCase() + shift.slice(1).toLowerCase();
 
         if (!driver_id) {
             return res.status(400).json({
@@ -19,7 +21,7 @@ const GetStopStudentCount = async (req, res) => {
 
         // Get driver's route
         const driverRoute = await pool.query(
-            `SELECT route_id FROM trips WHERE driver_id = $1 AND shift = $2`,
+            `SELECT route_id FROM trips WHERE driver_id = $1 AND LOWER(shift::text) = LOWER($2)`,
             [driver_id, shift]
         );
 
