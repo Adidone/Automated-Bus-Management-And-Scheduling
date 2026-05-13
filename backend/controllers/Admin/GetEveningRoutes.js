@@ -4,7 +4,7 @@ const GetEveningRoutes = async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, name FROM routes 
-            WHERE shift = 'Evening' 
+            WHERE LOWER(shift) = 'evening' 
             ORDER BY name ASC
         `);
         return res.status(200).json({
