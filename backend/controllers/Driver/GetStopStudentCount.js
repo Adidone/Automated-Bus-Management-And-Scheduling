@@ -51,7 +51,10 @@ const GetStopStudentCount = async (req, res) => {
                 END) as not_coming_today
             FROM route_stops rs
             JOIN stops st ON rs.stop_id = st.id
-            LEFT JOIN students s ON s.stop_id = st.id AND s.route_id = $1
+            LEFT JOIN students s ON s.stop_id = st.id AND (
+                (LOWER($2) = 'morning' AND s.morning_route_id = $1) OR
+                (LOWER($2) = 'evening' AND s.evening_route_id = $1)
+            )
             LEFT JOIN student_attendance sa ON sa.student_id = s.id 
                 AND sa.date = CURRENT_DATE 
                 AND sa.shift = $2
