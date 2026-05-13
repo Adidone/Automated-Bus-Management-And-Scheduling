@@ -15,6 +15,8 @@ const GetStops = require("../controllers/Admin/GetStops.js");
 const GetStudents = require("../controllers/Admin/GetStudents.js");
 const DeleteTrip = require("../controllers/Admin/DeleteTrip.js");
 const AddStudent = require("../controllers/Student/AddStudent.js");
+const GetMorningRoutes = require("../controllers/Admin/GetMorningRoutes.js");
+const GetEveningRoutes = require("../controllers/Admin/GetEveningRoutes.js");
 
 router.post("/login", AdminLogin);
 router.post("/addbus", AddBus);
@@ -29,6 +31,8 @@ router.get("/buses", GetBuses);
 router.get("/routes", GetRoutes);
 router.get("/drivers", GetDrivers);
 router.get("/stops", GetStops);
+router.get("/morning-routes", GetMorningRoutes);
+router.get("/evening-routes", GetEveningRoutes);
 router.get("/students", GetStudents);
 router.delete("/deletetrip/:id", DeleteTrip);
 
