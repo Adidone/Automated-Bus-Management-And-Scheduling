@@ -60,7 +60,7 @@ const GetStopStudentCount = async (req, res) => {
             )
             LEFT JOIN student_attendance sa ON sa.student_id = s.id 
                 AND sa.date = CURRENT_DATE 
-                AND sa.shift = $2
+                AND LOWER(sa.shift::text) = LOWER($2)
             WHERE rs.route_id = $1
             GROUP BY st.id, st.name, st.latitude, st.longitude, rs.stop_order
             ORDER BY rs.stop_order ASC`,
