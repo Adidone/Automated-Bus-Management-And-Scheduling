@@ -12,7 +12,16 @@ const StudentLogin = async (req, res) => {
         }
 
         const result = await pool.query(
-            "SELECT * FROM students WHERE roll_no = $1 AND password = $2",
+            `SELECT 
+                s.*, 
+                st.name as stop_name,
+                r1.name as morning_route_name,
+                r2.name as evening_route_name
+             FROM students s
+             LEFT JOIN stops st ON s.stop_id = st.id
+             LEFT JOIN routes r1 ON s.morning_route_id = r1.id
+             LEFT JOIN routes r2 ON s.evening_route_id = r2.id
+             WHERE s.roll_no = $1 AND s.password = $2`,
             [roll_no, password]
         );
 

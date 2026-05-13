@@ -11,7 +11,7 @@ const AddRoute = async (req, res) => {
     const { name, start_stop_id, end_stop_id, middle_stop_ids = [], shift } = req.body;
 
     await client.query('BEGIN');
-    
+
     if (!name || !start_stop_id || !end_stop_id) {
       await client.query('ROLLBACK');
       return res.status(400).json({
@@ -33,7 +33,7 @@ const AddRoute = async (req, res) => {
     }
 
     const allStopIds = [Number(start_stop_id), ...middle_stop_ids.map(Number), Number(end_stop_id)];
-    
+
     const stopsQuery = await client.query(
       "SELECT id, latitude, longitude, name FROM stops WHERE id = ANY($1::int[])",
       [allStopIds]
