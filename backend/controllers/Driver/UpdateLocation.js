@@ -120,6 +120,9 @@ const UpdateLocation = async (req, res) => {
             await pool.query("DELETE FROM todays_attendance;");
             await pool.query("DELETE FROM student_attendance;");
             await pool.query("DELETE FROM completed_stops WHERE driver_id = $1;", [driver_id]);
+            
+            // Delete the trip from the database
+            await pool.query("DELETE FROM trips WHERE driver_id = $1;", [driver_id]);
 
             console.log("🧹 Auto-cleared all tables after trip completion!");
         }
@@ -127,7 +130,8 @@ const UpdateLocation = async (req, res) => {
         return res.status(200).json({
             message: "Location updated",
             success: true,
-            completed_stops: completedStops
+            completed_stops: completedStops,
+            trip_completed: parseInt(completedStopss.rows[0].count) === parseInt(totalStops.rows[0].count)
         });
 
     } catch (err) {
