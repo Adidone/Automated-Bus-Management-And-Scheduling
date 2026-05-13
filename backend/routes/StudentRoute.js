@@ -9,6 +9,9 @@ const GetProfile = require("../controllers/Student/GetProfile");
 const GetRouteStops = require("../controllers/Student/GetRouteStops");
 const GetDriverLiveLocation = require("../controllers/Student/GetDriverLiveLocation");
 const StudentLogin = require("../controllers/Student/StudentLogin");
+const GetStudentNotifications = require("../controllers/Student/GetStudentNotifications");
+const MarkNotificationRead = require("../controllers/Student/MarkNotificationRead");
+const DeleteStudentNotification = require("../controllers/Student/DeleteStudentNotification");
 const router = express.Router();
 
 router.post("/add", AddStudent);
@@ -25,6 +28,9 @@ router.get("/attendance-status/:studentId", GetAttendanceStatus);
 router.get("/profile/:id", GetProfile);
 router.get("/route-stops/:route_id", GetRouteStops);
 router.get("/live-location/:driverId", GetDriverLiveLocation);
+router.get("/notifications/:studentId", GetStudentNotifications);
+router.post("/notifications/read", MarkNotificationRead);
+router.post("/notifications/delete", DeleteStudentNotification);
 
 
 module.exports = router;
