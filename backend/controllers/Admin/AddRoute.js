@@ -8,7 +8,7 @@ const MMI_API_KEY = process.env.MMI_API_KEY;
 const AddRoute = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { name, start_stop_id, end_stop_id } = req.body;
+    const { name, start_stop_id, end_stop_id, shift } = req.body;
 
     await client.query('BEGIN');
     
@@ -83,8 +83,8 @@ const AddRoute = async (req, res) => {
 
   
     const addRouteQuery = `
-      INSERT INTO routes (name, start_stop_id, end_stop_id, total_distance)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO routes (name, start_stop_id, end_stop_id, total_distance, shift)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *;
     `;
 
@@ -93,6 +93,7 @@ const AddRoute = async (req, res) => {
       start_stop_id,
       end_stop_id,
       totalDistance,
+      shift || 'Morning'
     ]);
 
     const newRoute = result.rows[0];
