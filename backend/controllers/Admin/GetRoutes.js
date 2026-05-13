@@ -7,6 +7,7 @@ const GetRoutes = async (req, res) => {
                 r.id, 
                 r.name, 
                 r.total_distance,
+                r.shift,
                 s1.name as start_stop_name,
                 s2.name as end_stop_name
             FROM routes r
