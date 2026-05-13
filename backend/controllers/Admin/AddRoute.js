@@ -8,7 +8,7 @@ const MMI_API_KEY = process.env.MMI_API_KEY;
 const AddRoute = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { name, start_stop_id, end_stop_id, shift } = req.body;
+    const { name, start_stop_id, end_stop_id, middle_stop_ids = [], shift } = req.body;
 
     await client.query('BEGIN');
     
@@ -20,7 +20,6 @@ const AddRoute = async (req, res) => {
       });
     }
 
-    
     const existingRoute = await client.query(
       "SELECT * FROM routes WHERE name = $1",
       [name]
@@ -33,39 +32,40 @@ const AddRoute = async (req, res) => {
       });
     }
 
-   
-    const start = await client.query(
-      "SELECT latitude, longitude, name FROM stops WHERE id = $1",
-      [start_stop_id]
-    );
-    const end = await client.query(
-      "SELECT latitude, longitude, name FROM stops WHERE id = $1",
-      [end_stop_id]
+    const allStopIds = [Number(start_stop_id), ...middle_stop_ids.map(Number), Number(end_stop_id)];
+    
+    const stopsQuery = await client.query(
+      "SELECT id, latitude, longitude, name FROM stops WHERE id = ANY($1::int[])",
+      [allStopIds]
     );
 
-    if (start.rows.length === 0 || end.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        message: "Invalid start or end stop ID",
-        success: false,
-      });
+    const stopsMap = {};
+    stopsQuery.rows.forEach(stop => {
+      stopsMap[stop.id] = stop;
+    });
+
+    for (let id of allStopIds) {
+      if (!stopsMap[id]) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          message: `Invalid stop ID: ${id}`,
+          success: false,
+        });
+      }
     }
 
-    const startCoords = `${start.rows[0].longitude},${start.rows[0].latitude}`;
-    const endCoords = `${end.rows[0].longitude},${end.rows[0].latitude}`;
+    const coordsArray = allStopIds.map(id => `${stopsMap[id].longitude},${stopsMap[id].latitude}`);
+    const coordsString = coordsArray.join(';');
 
-    console.log(` Start: ${startCoords}`);
-    console.log(` End: ${endCoords}`);
+    console.log(` Route Coordinates: ${coordsString}`);
 
-    
     const token = await getToken();
     if (!token) {
       await client.query('ROLLBACK');
       return res.status(500).json({ message: "Failed to get MMI token" });
     }
 
-    
-    const url = `https://apis.mapmyindia.com/advancedmaps/v1/${MMI_API_KEY}/route_adv/driving/${startCoords};${endCoords}?geometries=polyline&overview=full`;
+    const url = `https://apis.mapmyindia.com/advancedmaps/v1/${MMI_API_KEY}/route_adv/driving/${coordsString}?geometries=polyline&overview=full`;
     console.log("MMI API URL:", url);
 
     const response = await axios.get(url, {
@@ -78,10 +78,10 @@ const AddRoute = async (req, res) => {
 
     const routeData = response.data.routes[0];
     const totalDistance = (routeData.distance / 1000).toFixed(2);
+    const legs = routeData.legs || [];
 
     console.log(" Total Distance (km):", totalDistance);
 
-  
     const addRouteQuery = `
       INSERT INTO routes (name, start_stop_id, end_stop_id, total_distance, shift)
       VALUES ($1, $2, $3, $4, $5)
@@ -97,7 +97,21 @@ const AddRoute = async (req, res) => {
     ]);
 
     const newRoute = result.rows[0];
-    await client.query('COMMIT')
+
+    // Insert all stops into route_stops
+    for (let i = 0; i < allStopIds.length; i++) {
+      let distFromPrev = 0;
+      if (i > 0 && legs[i - 1]) {
+        distFromPrev = (legs[i - 1].distance / 1000).toFixed(2);
+      }
+      await client.query(
+        `INSERT INTO route_stops (route_id, stop_id, stop_order, distance_from_previous_stop)
+         VALUES ($1, $2, $3, $4)`,
+        [newRoute.id, allStopIds[i], i + 1, distFromPrev]
+      );
+    }
+
+    await client.query('COMMIT');
     return res.status(201).json({
       message: "Route added successfully",
       route: newRoute,
