@@ -11,6 +11,7 @@ const GetLiveLocations = require("../controllers/Driver/GetLiveLocations.js");
 const ClearLocation = require("../controllers/Driver/ClearLocation.js");
 const GetStopStudentCount = require("../controllers/Driver/GetStopStudentCount.js");
 const DriverLogin = require("../controllers/Driver/DriverLogin.js");
+const GetDriverNotifications = require("../controllers/Driver/GetDriverNotifications.js");
 const router = express.Router();
 
 router.post("/add",AddDriver);
@@ -24,5 +25,6 @@ router.get("/completed-stops/:driverId", GetCompletedStops);
 router.get("/location/:driverId", GetLiveLocations);
 router.post("/clear-location", ClearLocation);
 router.get("/stop-student-count", GetStopStudentCount);
+router.get("/notifications/:driverId", GetDriverNotifications);
 
 module.exports = router;
