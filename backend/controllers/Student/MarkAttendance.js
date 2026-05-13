@@ -21,7 +21,7 @@ const MarkAttendance = async (req, res) => {
                 reason = EXCLUDED.reason,
                 marked_at = NOW()
              RETURNING *`,
-            [student_id, is_coming, 'Morning', reason]
+            [student_id, is_coming, shift || 'Morning', reason]
         );
 
         return res.json({
