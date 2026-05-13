@@ -10,10 +10,16 @@ const GetStudents = async (req, res) => {
                 s.phone, 
                 s.email, 
                 s.address, 
-                s.stop_name, 
-                r.name as route_name
+                st.name as stop_name,
+                s.stop_id,
+                s.morning_route_id,
+                r1.name as morning_route_name,
+                s.evening_route_id,
+                r2.name as evening_route_name
             FROM students s
-            LEFT JOIN routes r ON s.route_id = r.id
+            LEFT JOIN stops st ON s.stop_id = st.id
+            LEFT JOIN routes r1 ON s.morning_route_id = r1.id
+            LEFT JOIN routes r2 ON s.evening_route_id = r2.id
             ORDER BY s.id DESC
         `);
         return res.status(200).json({
