@@ -11,7 +11,7 @@ const GetDriverLiveLocation = require("../controllers/Student/GetDriverLiveLocat
 const StudentLogin = require("../controllers/Student/StudentLogin");
 const router = express.Router();
 
-router.post("/add",AddStudent);
+router.post("/add", AddStudent);
 router.post("/login", StudentLogin);
 router.post("/mark-attendance", MarkAttendance);
 router.get("/info/:studentId", GetStudentInfo);
